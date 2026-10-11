@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Routory · 계정 삭제 요청</title>
+  <!-- 이 페이지는 SPA(index.html) 밖의 독립된 정적 페이지다 — 로그인 없이도 열려야 해서(요청 3번)
+       router.js의 로그인 가드를 거치는 해시 라우트(#/...)로 만들지 않았다. Google Play 데이터 안전
+       양식에는 이 주소(https://<배포 도메인>/account-deletion)를 그대로 등록한다. 같은 이유로 colors는
+       css/style.css의 토큰을 가져다 쓸 수 없어 숫자(hex)를 그대로 적었다 — naver-callback.html과 같은
+       방식, 토큰 값이 바뀌면 이 파일도 손으로 맞춰야 한다(CLAUDE.md "Font color policy" 참고). -->
+  <style>
+    :root { color-scheme: light; }
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      padding: 40px 20px;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: #f5f5f7;
+      color: #26364a;
+      word-break: keep-all;
+    }
+    .box {
+      max-width: 480px;
+      margin: 0 auto;
+      background: #ffffff;
+      border-radius: 16px;
+      padding: 32px 28px;
+      box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+    }
+    .logo {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      margin-bottom: 24px;
+    }
+    .logo-badge {
+      width: 28px;
+      height: 28px;
+      border-radius: 8px;
+      background: #007aff;
+      color: #fff;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: 800;
+      font-size: 15px;
+      flex-shrink: 0;
+    }
+    .logo-text { font-weight: 800; font-size: 17px; }
+    h1 { font-size: 20px; margin: 0 0 8px; }
+    p { font-size: 14px; line-height: 1.6; color: #64748b; margin: 0 0 16px; }
+    .self-serve-note {
+      padding: 12px 14px;
+      border-radius: 10px;
+      background: #e8f1ff;
+      font-size: 13px;
+      line-height: 1.6;
+      color: #26364a;
+      margin-bottom: 20px;
+    }
+    .self-serve-note a { color: #3b82f6; font-weight: 600; }
+    h2 { font-size: 14px; margin: 24px 0 8px; color: #1e293b; }
+    ul { margin: 0 0 20px; padding-left: 20px; font-size: 13px; line-height: 1.7; color: #64748b; }
+    label { display: block; font-size: 13px; font-weight: 700; color: #1e293b; margin: 16px 0 6px; }
+    input, select, textarea {
+      width: 100%;
+      padding: 10px 12px;
+      border: 1px solid #d8dee8;
+      border-radius: 10px;
+      font-size: 14px;
+      font-family: inherit;
+      color: #26364a;
+      background: #fff;
+    }
+    textarea { resize: vertical; min-height: 72px; }
+    input:focus, select:focus, textarea:focus { outline: 2px solid #3b82f6; outline-offset: 1px; }
+    button {
+      width: 100%;
+      margin-top: 24px;
+      padding: 13px;
+      border: none;
+      border-radius: 10px;
+      background: #007aff;
+      color: #fff;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+    }
+    button:disabled { opacity: 0.5; cursor: not-allowed; }
+    .status { margin-top: 16px; font-size: 13px; line-height: 1.6; }
+    .status--error { color: #ff7b72; }
+    .status--success { color: #16a34a; }
+    .done-box { text-align: center; padding: 12px 0; }
+    .done-box .check { font-size: 36px; margin-bottom: 8px; }
+  </style>
+</head>
+<body>
+  <div class="box">
+    <div class="logo">
+      <span class="logo-badge">R</span>
+      <span class="logo-text">Routory</span>
+    </div>
+
+    <h1>계정 삭제 요청</h1>
+    <p>Routory 계정과 계정에 담긴 데이터를 삭제하고 싶다면 아래 정보를 입력해서 요청해주세요. 확인 후 처리해드릴게요.</p>
+
+    <div class="self-serve-note">
+      이미 로그인할 수 있다면 앱 안에서 더 빠르게 처리할 수 있어요 — <a href="/#/login">로그인</a> 후
+      <strong>설정 → 계정 → 회원 탈퇴</strong>를 이용해주세요. 로그인할 수 없는 경우에만 이 양식을 이용해주세요.
+    </div>
+
+    <h2>삭제되는 정보</h2>
+    <ul>
+      <li>계정 정보(이름, 이메일, 프로필 사진 등 로그인 정보)</li>
+      <li>등록한 모든 여행 계획(제목, 목적지, 기간)</li>
+      <li>여행 일정(장소, 메모, 항공편 등)</li>
+      <li>가계부(지출) 기록</li>
+      <li>여행지갑에 올린 파일(여권, 항공권, QR코드 등)</li>
+      <li>초대 링크와 함께한 동행자(멤버) 정보</li>
+    </ul>
+
+    <form id="form">
+      <label for="email">이메일 (필수)</label>
+      <input type="email" id="email" name="email" required placeholder="가입할 때 쓴 이메일 또는 연락 가능한 이메일" />
+
+      <label for="provider">로그인 수단</label>
+      <select id="provider" name="provider">
+        <option value="">선택 안 함</option>
+        <option value="google">구글</option>
+        <option value="kakao">카카오</option>
+        <option value="naver">네이버</option>
+        <option value="other">기타 / 모름</option>
+      </select>
+
+      <label for="message">전달할 내용 (선택)</label>
+      <textarea id="message" name="message" placeholder="본인 확인에 도움이 될 정보가 있다면 적어주세요 (예: 가입 시 사용한 닉네임, 등록했던 여행 제목 등)"></textarea>
+
+      <button type="submit" id="submit-btn">삭제 요청 보내기</button>
+      <p class="status" id="status" hidden></p>
+    </form>
+
+    <div id="done" hidden>
+      <div class="done-box">
+        <div class="check">✅</div>
+        <h2 style="font-size: 18px; color: #26364a; margin: 0 0 8px;">요청이 접수되었어요</h2>
+        <p>확인 후 처리해드릴게요. 추가로 확인할 내용이 있으면 입력하신 이메일로 연락드릴 수 있어요.</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- 이 페이지는 SPA(index.html) 밖의 독립된 정적 페이지라 window.TripLog.supabase를 쓸 수 없다 — supabase-js를
+       따로 불러와서 이 파일 안에서만 쓰는 클라이언트를 새로 만든다(naver-callback.html과 같은 방식, 같은 CDN·버전). -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script>
+    (function () {
+      // triplog/js/supabaseClient.js와 같은 값. anon 키는 비밀값이 아니다(그 파일의 설명 참고) — 데이터
+      // 보호는 012_account_deletion_requests.sql의 RLS(쓰기 전용, 조회 불가)가 맡는다.
+      const SUPABASE_URL = "https://ffzjgiknrrgwvgobybdq.supabase.co";
+      const SUPABASE_ANON_KEY =
+        "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImZmempnaWtucnJnd3Znb2J5YmRxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODk4ODY5MjksImV4cCI6MjEwNTQ2MjkyOX0.65VHeuLTokig13dfWoNQtqBLG9AthDQO_UGSN8Vn7DQ";
+      // 이 페이지는 로그인하지 않은 사람도 열어야 해서(요청 3번) 세션을 만들거나 유지할 필요가 없다 —
+      // persistSession/detectSessionInUrl을 모두 꺼서 이 요청 하나만 보내는 일회용 클라이언트로 쓴다.
+      const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+        auth: { persistSession: false, detectSessionInUrl: false },
+      });
+
+      const form = document.getElementById("form");
+      const statusEl = document.getElementById("status");
+      const submitBtn = document.getElementById("submit-btn");
+
+      function showStatus(message, isError) {
+        statusEl.textContent = message;
+        statusEl.className = "status " + (isError ? "status--error" : "status--success");
+        statusEl.hidden = false;
+      }
+
+      form.addEventListener("submit", async function (e) {
+        e.preventDefault();
+        statusEl.hidden = true;
+        submitBtn.disabled = true;
+        submitBtn.textContent = "보내는 중...";
+
+        const email = document.getElementById("email").value.trim();
+        const provider = document.getElementById("provider").value || null;
+        const message = document.getElementById("message").value.trim() || null;
+
+        try {
+          const { error } = await supabase
+            .from("account_deletion_requests")
+            .insert({ email: email, login_provider: provider, message: message });
+          if (error) throw error;
+        } catch (err) {
+          console.warn("[account-deletion] 요청 접수 실패", err);
+          submitBtn.disabled = false;
+          submitBtn.textContent = "삭제 요청 보내기";
+          // 012 마이그레이션을 아직 실행하지 않았으면(테이블 없음) 여기로 떨어진다 - 사람이 보는 메시지는
+          // 내부 사정 대신 "잠시 후 다시 시도"로 통일한다(accountDeletePage.js와 같은 원칙).
+          showStatus("요청을 보내지 못했어요. 잠시 후 다시 시도해주시거나, 다른 방법으로 문의해주세요.", true);
+          return;
+        }
+
+        form.hidden = true;
+        document.getElementById("done").hidden = false;
+      });
+    })();
+  </script>
+</body>
+</html>

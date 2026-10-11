@@ -1,0 +1,82 @@
+PRD v3 — 여행 공유 · 초대 기능
+1. 개요 및 핵심 전제
+지금까지는 Trip/ScheduleItem 데이터가 브라우저 localStorage에만 있어서, 기기나 계정이 다르면 절대 공유가 안 됩니다. 초대 기능을 넣으려면 다음이 선행되어야 해요:
+• 여행 데이터를 localStorage → Supabase 데이터베이스(Postgres)로 이전
+• 여러 계정이 같은 여행에 접근할 수 있도록 권한 모델(trip_members) 추가
+• Supabase는 이미 로그인용으로 연동되어 있으므로, 같은 프로젝트에 테이블만 추가하면 됨
+2. 데이터베이스 설계
+-- 여행
+create table trips (
+  id uuid primary key default gen_random_uuid(),
+  owner_id uuid references auth.users(id) not null,
+  title text not null,
+  destination text,
+  start_date date not null,
+  end_date date not null,
+  created_at timestamptz default now()
+);
+
+-- 일정
+create table schedule_items (
+  id uuid primary key default gen_random_uuid(),
+  trip_id uuid references trips(id) on delete cascade,
+  date date not null,
+  time time,
+  category text not null,
+  title text not null,
+  place text,
+  memo text,
+  created_by uuid references auth.users(id),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+-- 멤버(소유자+초대받은 사람)
+create table trip_members (
+  id uuid primary key default gen_random_uuid(),
+  trip_id uuid references trips(id) on delete cascade,
+  user_id uuid references auth.users(id),
+  role text default 'editor' check (role in ('owner','editor')),
+  joined_at timestamptz default now(),
+  unique(trip_id, user_id)
+);
+
+-- 초대 링크
+create table trip_invites (
+  id uuid primary key default gen_random_uuid(),
+  trip_id uuid references trips(id) on delete cascade,
+  invite_code text unique not null,
+  created_by uuid references auth.users(id),
+  expires_at timestamptz default (now() + interval '7 days'),
+  created_at timestamptz default now()
+);
+3. 초대 플로우
+3-1) 초대링크 복사
+1. '초대링크 복사' 버튼 클릭 → 해당 tripId의 유효한 invite_code가 있으면 재사용, 없거나 만료되었으면 새로 생성
+2. https://도메인/#/invite/[invite_code] 형태의 URL을 만들어 navigator.clipboard.writeText()로 복사
+3. 상대방이 링크 클릭 → 로그인 안 되어있으면 로그인 후 자동으로 돌아옴 → /invite/:code 페이지에서 invite_code 검증 → trip_members에 본인 추가 → 해당 여행 페이지로 이동
+3-2) 카카오톡 공유
+• 카카오 로그인과는 별개로, 카카오톡 공유하기(Kakao Share) JS SDK가 필요함
+• 카카오 디벨로퍼스에서 '카카오로그인' 외에 '카카오톡 공유' 기능도 활성화 필요 (플랫폼 도메인은 로그인과 공유)
+• Kakao.Share.sendDefault()로 Feed 템플릿(제목, 설명, 이미지, '여행 참여하기' 버튼 + 위 초대링크 URL)을 전송
+• 받는 사람이 버튼 클릭 → 위 3-1과 동일한 /invite/:code 플로우로 연결
+4. 권한 모델 (기본값 제안)
+• owner: 여행 생성자, 일정 CRUD + 멤버 관리 + 여행 삭제 가능
+• editor(초대받은 사람): 일정 CRUD만 가능, 멤버 관리/여행 삭제 불가
+5. RLS(Row Level Security) 정책
+alter table trips enable row level security;
+alter table schedule_items enable row level security;
+alter table trip_members enable row level security;
+
+create policy "멤버만 여행 조회" on trips for select
+  using (id in (select trip_id from trip_members where user_id = auth.uid()));
+
+create policy "멤버만 일정 조회/수정" on schedule_items for all
+  using (trip_id in (select trip_id from trip_members where user_id = auth.uid()));
+
+create policy "본인 멤버십만 조회" on trip_members for select
+  using (user_id = auth.uid() or trip_id in (select trip_id from trip_members where user_id = auth.uid()));
+6. 오픈 이슈 (기본값으로 진행, 필요시 수정 요청)
+• 초대받은 사람 권한: editor 고정으로 진행 (일정 CRUD만, 멤버/여행 관리는 owner만)
+• 초대링크 만료기간: 7일로 설정
+• 멤버 목록/강퇴 UI는 이번 범위에 포함 (간단한 리스트 + 강퇴 버튼만)

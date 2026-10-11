@@ -1,0 +1,5318 @@
+/* TripLog 스타일시트
+
+   1. 디자인 토큰  [TOKENS]
+   2. 기본 스타일  [BASE]
+   3. 모달  [MODAL]
+   4. 폼 · 버튼  [FORM]
+   5. 단계형 모달(위저드) 공통 · 탭 · 선택 목록 · 달력  [WIZARD] [TRIP-SETUP] [CALENDAR]
+   6. 일정 화면: 헤더 · 빠른 메뉴 · 지도 · 타임라인 · 일정 추가 창  [SCHEDULE] [INVITE] [QUICK-MENU] [DAY-MAP] [TIMELINE] [SCHEDULE-FORM]
+   7. 항공편  [FLIGHT]
+   8. 숙소  [LODGING]
+   9. 화면(라우트) 공통 · 메인 화면 · 초대 화면 · 로그인 화면  [MAIN] [INVITE-PAGE] [LOGIN]
+   10. 나의 여행 화면  [MYTRIP] [MEMBERS]
+   11. 알럿 · 토스트  [UI]
+   12. 반응형 · 접근성  [RESPONSIVE]
+   13. 별칭 보기 (개발용)  [ALIAS-VIEW]
+   14. 가계부 (#/budget/:id)  [BUDGET] [BUDGET-SWIPE] [EXPENSE-FORM]
+   15. 여행지갑 (#/wallet)  [WALLET] [WALLET-FORM] [WALLET-VIEWER]
+   16. 여행 가져오기 창  [TRIP-IMPORT-MODAL]
+   17. 여행 가져오기 미리보기 창  [TRIP-IMPORT-PREVIEW]
+*/
+
+/* ==========================================================================
+   1. 디자인 토큰  [TOKENS]
+   ========================================================================== */
+
+:root {
+  color-scheme: light;
+
+  /* 기본 색상 */
+  --page-bg: #f5f5f7;
+  /* 파스텔 블루 페이지 배경 - 최종적으로는 모든 화면에 적용할 예정이다. 메인 화면(body.has-main-bg)과
+     SHELL이 떠 있는 나의 여행·일정·가계부·여행지갑·숙소 다섯 화면(body.has-trip-shell)에 걸려 있고,
+     아직 옮기지 않은 화면은 --page-bg 그대로다. */
+  --page-bg-blue: #e8f1ff;
+  /* --page-bg-blue 위에 얹는 헤더·푸터·버튼 등 표면 색 - 페이지 배경보다 한 단계 더 진한 파스텔 블루다.
+     흰 --surface/회색 --surface-muted와 같은 자리(표면)에서, 파란 배경 위에 있을 때만 이걸 대신 쓴다. */
+  --surface-blue: #d6e4fb;
+  --surface: #ffffff;
+  --surface-muted: #f0f0f2;
+  /* 폰트 컬러 정책 (아래 Conventions의 "폰트 컬러 정책" 참고): 검정 대신 --text(기본 글자), 제목/강조는
+     --text-soft, 보조 글자는 --text-muted, 비활성화는 --disabled/--text-faint를 쓴다. --accent/--danger는
+     버튼·배경·테두리 등 UI 전반에서 재사용되므로 색 자체는 바꾸지 않고, 글자색 전용으로 --text-accent(블루
+     계열)/--text-danger(레드 계열)를 따로 둔다 - color: 선언에만 이 둘을 쓰고 background/border-color는
+     그대로 --accent/--danger를 쓴다. */
+  --text: #26364a;
+  --text-soft: #1e293b;
+  --text-muted: #64748b;
+  --text-faint: #94a3b8;
+  --text-warm-muted: #7a5e4f; /* 따뜻한 파스텔톤 정책(아래 참고) 아래 새로 추가하는 보조 문구용 - 회색 계열 --text-* 대신 이 톤을 쓴다 */
+  --disabled: #94a3b8;
+  --border: #e2e2e5;
+  --accent: #007aff;
+  --danger: #ff3b30;
+  --text-accent: #3b82f6; /* 폰트 컬러 정책의 "블루 계열" - color: 전용, background/border-color는 --accent(#007aff) 그대로 */
+  --text-danger: #ff7b72; /* 폰트 컬러 정책의 "레드 계열" - color: 전용, background/border-color는 --danger(#ff3b30) 그대로 */
+  /* 파스텔 톤 정책(아래 참고) 아래, 경고/위험 텍스트에 진한 --danger 대신 쓰는 파스텔 버전 - 맨 처음
+     지정했던 D-day 배지 코랄(RGB(255,150,138))과 같은 색이라 앱 안에서 "파스텔 빨강"의 기준이 된다. */
+  --danger-pastel: #ff968a;
+  --success: #1a7f37;
+  --warning: #b35c00;
+
+  /* 메인 화면 여행 카드의 D-day 배지: 파스텔 톤 정책(아래 참고) 아래 --danger(진한 빨강) 대신 쓴다.
+     배경은 파스텔 블루(--danger-pastel과 밝기가 비슷하도록 골랐다), 글자는 흰색 - 대비는 밝은 톤끼리라
+     WCAG AA 4.5:1에는 못 미치지만, 파스텔 톤을 우선하는 방향 그대로 쓴다. 지난 여행은 배경만 파스텔
+     회색(--dday-pastel-gray-bg)으로 바뀌고 글자는 --dday-pastel-ink(흰색)를 그대로 쓴다. */
+  --dday-pastel-bg: #8cb4ff;
+  --dday-pastel-ink: #ffffff;
+  --dday-pastel-gray-bg: #dde2e8;
+
+  /* 여행 카드의 동료 아바타(이니셜 배경): 마찬가지로 새로 꾸미는 색이라 --accent(파랑) 대신 파스텔
+     복숭아색을 쓰고, 흰 글자 대신 --route-N처럼 짙은 잉크색을 짝지운다(대비 6.2:1, 10px 굵은 글자용). */
+  --avatar-pastel-bg: #f0c39a;
+  --avatar-pastel-ink: #6b3315;
+
+  /* 카테고리 색상 (MVP에서 정의한 값). 카테고리를 표시하는 모든 요소가 --cat-color로 이 값을 공유한다 */
+  --color-all: #1c1c1e;
+  --color-flight: #007aff;
+  --color-lodging: #7c4dff;
+  --color-meal: #ff9500;
+  --color-sightseeing: #34c759;
+  --color-shopping: #ff2d78;
+  --color-etc: #8e8e93;
+
+  /* 일정 지도: Day별 번호 마커·점선 색 (Day 1부터 차례로, 6일을 넘으면 처음부터 다시). 원색이 아닌 따뜻한
+     톤(주황·로즈·머스터드·브릭·핑크·올리브)이면서도, 여행 일수가 5~6일이라 이 6색이 한 화면(타임라인)에
+     동시에 다 보여도 서로 헷갈리지 않게 골랐다: dataviz 스킬의 validate_palette.js로 "이웃한 Day끼리"뿐
+     아니라 --pairs all(6색 15쌍 전부)로도 일반 시각 기준 구별 가능(ΔE 18.6, 기준 15 이상)을 확인했다.
+     같은 이유로 명도/색상을 한 방향으로만 고르지 않고(예: 전부 밝은 파스텔) OKLCH L·C·H 세 축을 함께
+     흔들어야 15쌍이 전부 벌어진다는 걸 확인한 뒤 값을 정했다(스크립트로 최적화 - 눈대중 아님).
+     색약 시뮬레이션(protan/deutan)까지 6색 전부 구별되게 하는 건 이 "따뜻한 톤만" 제약 안에서는 구조적으로
+     안 된다(dataviz 스킬 문서의 기본 8색 팔레트조차 --pairs all에서는 3개까지만 통과) - 대신 번호가 항상
+     같이 보이니(카드 자체가 secondary encoding) 색만으로 구분해야 하는 상황은 아니다.
+     각 색은 밝기가 서로 달라서 번호 글자색(--route-N-ink)도 색마다 대비가 되는 쪽(밝게/어둡게)으로 따로
+     정해 둔다. */
+  --route-1: #e96200; /* 주황 */
+  --route-1-ink: #3a2416;
+  --route-2: #c73a86; /* 로즈 */
+  --route-2-ink: #fff8f1;
+  --route-3: #ccb100; /* 머스터드(골드) */
+  --route-3-ink: #3a2416;
+  --route-4: #991900; /* 브릭(짙은 적갈색) */
+  --route-4-ink: #fff8f1;
+  --route-5: #fa85bb; /* 핑크 */
+  --route-5-ink: #3a2416;
+  --route-6: #816f00; /* 올리브(짙은 카키골드) */
+  --route-6-ink: #fff8f1;
+  --route-line: #5c4a3d; /* 같은 Day의 장소를 잇는 점선 (따뜻한 톤의 짙은 회갈색) */
+
+  /* 소셜 로그인 버튼: 각 서비스의 대표 색 (구글은 흰 바탕에 회색 테두리, 카카오는 노랑, 네이버는 초록) */
+  --brand-google-border: #747775;
+  --brand-google-text: #1f1f1f;
+  --brand-kakao: #fee500;
+  --brand-kakao-text: rgba(0, 0, 0, 0.85);
+  --brand-naver: #03c75a;
+  --brand-naver-text: #ffffff;
+
+  /* 나의 여행 화면의 민트 */
+  --mint: #64cbc0; /* 헤더·카테고리 탭바 배경 */
+  --mint-dark: #52b7ac; /* 날짜 알약 */
+  --mint-deep: #23968a; /* 흰 배경 위의 민트 글자·테두리 */
+
+  /* 모서리 */
+  --radius-sm: 8px;
+  --radius-md: 14px;
+  --radius-pill: 999px;
+
+  /* 간격 */
+  --space-2: 8px;
+  --space-3: 12px;
+  --space-4: 16px;
+  --space-5: 20px;
+  --space-6: 24px;
+
+  --tap-min: 44px; /* 모든 인터랙티브 요소의 최소 터치 타겟 */
+  --content-max: 640px; /* 모바일→데스크톱 확장 시 콘텐츠가 갇히는 최대 폭 */
+
+  /* 그림자 */
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.2);
+
+  /* 겹침 순서: 여행 셸(고정 상단바·하단탭바) < 슬라이드 메뉴 < 모달 < 알럿 < 토스트 */
+  --z-shell: 80;
+  --z-drawer: 90;
+  --z-modal: 100;
+  --z-alert: 300;
+  --z-toast: 400;
+  --z-dev: 900; /* 별칭 보기(개발용)는 모든 것 위에 */
+
+  /* 여행 공통 셸(SHELL)의 상단·하단 고정 바 높이. 나의 여행·일정·가계부·여행지갑 네 화면에서 항상 떠 있어서
+     그 화면들이 이 값만큼 안쪽으로 비켜 앉는다 (아래 [MYTRIP-TOPBAR]/[MYTRIP-BOTTOMTABS]의 실제 높이와 맞춰 둔다). */
+  --shell-top-h: calc(60px + env(safe-area-inset-top));
+  --shell-bottom-h: calc(57px + env(safe-area-inset-bottom));
+}
+
+/* 네이티브 앱(Capacitor)의 노치·홈 인디케이터 영역을 피한다. 웹(브라우저)에서는 env()가 0이라 아무 효과가 없다.
+   이 :root 패딩은 body가 그냥 평범하게 스크롤되는 화면(메인·로그인 등)에만 효과가 있다 — position: fixed로
+   화면 전체를 차지하는 화면(my-trip·budget·wallet 등, inset: 0은 :root의 패딩과 무관하게 뷰포트 기준)과
+   position: sticky/fixed인 상단·하단 바는 이 값을 상속받지 않으므로, 그런 바들은 각자 자기 자리에서
+   env(safe-area-inset-*)를 따로 더해 준다 ([SCHEDULE]의 .app-top, [MYTRIP-TOPBAR]의 .mytrip-bar 등). */
+:root {
+  padding-top: env(safe-area-inset-top);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+@media (min-width: 600px) {
+  :root {
+    --content-max: 720px;
+  }
+}
+
+@media (min-width: 1024px) {
+  :root {
+    --content-max: 860px;
+  }
+}
+
+/* 카테고리 색상 매핑: data-category를 가진 요소는 --cat-color(배경·태그 색)를 공유한다 */
+[data-category] {
+  --cat-color: var(--color-etc);
+}
+
+[data-category="all"] {
+  --cat-color: var(--color-all);
+}
+
+[data-category="flight"] {
+  --cat-color: var(--color-flight);
+}
+
+[data-category="lodging"] {
+  --cat-color: var(--color-lodging);
+}
+
+[data-category="meal"] {
+  --cat-color: var(--color-meal);
+}
+
+[data-category="sightseeing"] {
+  --cat-color: var(--color-sightseeing);
+}
+
+[data-category="shopping"] {
+  --cat-color: var(--color-shopping);
+}
+
+[data-category="etc"] {
+  --cat-color: var(--color-etc);
+}
+
+/* ==========================================================================
+   2. 기본 스타일  [BASE]
+   ========================================================================== */
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+}
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+  background: var(--page-bg);
+  color: var(--text);
+  padding-bottom: var(--space-6);
+  word-break: keep-all; /* 한글은 어절 단위로 줄바꿈하고, 한 어절이 너무 길 때만 자른다 */
+  overflow-wrap: break-word;
+  -webkit-tap-highlight-color: transparent;
+}
+
+/* 메인 화면(#/main)에 있는 동안만 파스텔 블루 배경 - mainPage.js가 router.onEnter/onLeave에서
+   여닫는다. 다른 화면은 아직 --page-bg(회색) 그대로다. */
+body.has-main-bg {
+  background: var(--page-bg-blue);
+}
+
+/* 알림·설정 공용 화면(#/notifications, #/settings, commonPages.js)에 있는 동안만 배경을 --surface-blue로 -
+   commonPages.js가 router.onEnter/onLeave에서 여닫는다(위 body.has-main-bg와 같은 패턴). */
+body.has-simple-page-bg {
+  background: var(--surface-blue);
+}
+
+/* SHELL(tripShell.js)이 떠 있는 다섯 화면(나의 여행·일정·가계부·여행지갑·숙소)도 같은 파스텔 블루 -
+   body.has-trip-shell은 tripShell.js#updateShell이 여닫는다. 가계부/여행지갑/숙소/나의 여행은 SHELL
+   위에서 전체 화면을 덮는 자기 배경(.budget-shell 등)이 따로 있어 이 규칙이 실제로 보이는 건 그런 자기
+   배경이 없는 일정 화면(.app-top 아래 #timeline)뿐이다. */
+body.has-trip-shell {
+  background: var(--page-bg-blue);
+}
+
+[hidden] {
+  display: none !important;
+}
+
+/* ==========================================================================
+   3. 모달  [MODAL]
+   ========================================================================== */
+
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--space-5);
+  z-index: var(--z-modal);
+}
+
+.modal {
+  width: 100%;
+  max-width: 420px;
+  max-height: 90vh;
+  max-height: 90dvh;
+  overflow-y: auto;
+  background: var(--surface);
+  border-radius: 16px;
+  padding: var(--space-5);
+}
+
+@media (min-width: 600px) {
+  .modal {
+    max-width: 480px;
+    padding: var(--space-6);
+  }
+}
+
+.modal-confirm {
+  max-width: 320px;
+}
+
+.modal-title {
+  margin: 0 0 var(--space-4);
+  font-size: 18px;
+  font-weight: 700;
+}
+
+.modal-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.modal-actions-right {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-left: auto;
+}
+
+/* ==========================================================================
+   4. 폼 · 버튼  [FORM]
+   ========================================================================== */
+
+.form-field {
+  margin-bottom: var(--space-4);
+  flex: 1 1 140px;
+}
+
+.form-field label {
+  display: block;
+  margin-bottom: var(--space-2);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.form-field input[type="date"],
+.form-field input[type="text"],
+.form-field input[type="number"],
+.form-field textarea {
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-family: inherit;
+}
+
+.form-field textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.btn-add-image {
+  flex-shrink: 0;
+  width: 100%;
+  min-height: var(--tap-min);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.btn-add-image:hover {
+  border-color: var(--accent);
+  color: var(--text-accent);
+}
+
+.image-thumbs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.image-thumbs:empty {
+  margin-bottom: 0;
+}
+
+.image-thumb {
+  position: relative;
+  width: 64px;
+  height: 64px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--page-bg);
+}
+
+.image-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.image-thumb-remove {
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 22px;
+  height: 22px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.6);
+  color: #ffffff;
+  font-size: 13px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.form-error {
+  margin: 0 0 var(--space-4);
+  color: var(--text-danger);
+  font-size: 13px;
+}
+
+.btn {
+  min-height: var(--tap-min);
+  padding-inline: var(--space-4);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  border: 1px solid transparent;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+/* 누를 수 없는 상태(예: 항공편 2단계에서 항공사·편명을 다 넣기 전, 조회 중)는 흐리게 보여준다 */
+.btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+.btn-cancel {
+  background: var(--surface-muted);
+  color: var(--text);
+}
+
+.btn-save {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.btn-delete {
+  background: var(--surface);
+  color: var(--text-danger);
+  border-color: var(--danger);
+}
+
+.btn-danger {
+  background: var(--danger);
+  color: #ffffff;
+}
+
+.btn-block {
+  width: 100%;
+}
+
+/* ==========================================================================
+   5. 단계형 모달(위저드) 공통 · 탭 · 선택 목록 · 달력  [WIZARD] [TRIP-SETUP] [CALENDAR]
+   ========================================================================== */
+
+.wizard {
+  display: flex;
+  flex-direction: column;
+  max-width: 480px;
+  height: min(90vh, 720px);
+  height: min(90dvh, 720px);
+  padding: 0;
+  overflow: hidden;
+}
+
+.wizard-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5) var(--space-3);
+}
+
+.wizard-heading {
+  flex: 1;
+  min-width: 0;
+}
+
+.wizard-step-label {
+  margin: 0 0 2px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-accent);
+}
+
+.wizard-header .modal-title {
+  margin: 0;
+}
+
+.wizard-back,
+.wizard-close {
+  flex-shrink: 0;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.wizard-back:hover,
+.wizard-close:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.wizard-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 0 var(--space-5) var(--space-4);
+}
+
+.wizard-footer {
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  border-top: 1px solid var(--border);
+  background: var(--surface);
+}
+
+.tab-row {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.tab {
+  flex: 1;
+  min-height: var(--tap-min);
+  border: none;
+  border-bottom: 2px solid transparent;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.tab--active {
+  color: var(--text);
+  border-bottom-color: var(--text);
+}
+
+.tab-row--sub {
+  overflow-x: auto;
+  gap: var(--space-2);
+}
+
+.tab-row--sub .tab {
+  flex: 0 0 auto;
+  min-height: 36px;
+  padding-inline: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  font-size: 13px;
+  white-space: nowrap;
+}
+
+.tab-row--sub .tab--active {
+  background: var(--text);
+  border-color: var(--text);
+  color: #ffffff;
+}
+
+.pick-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.pick-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+}
+
+.pick-item--selected {
+  border-color: var(--accent);
+  background: rgba(0, 122, 255, 0.06);
+}
+
+.pick-thumb {
+  flex-shrink: 0;
+  width: 64px;
+  height: 64px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--page-bg);
+  font-size: 22px;
+  overflow: hidden;
+}
+
+.pick-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.pick-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.pick-name {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.pick-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.pick-btn {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding-inline: var(--space-4);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-accent);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pick-btn--selected {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.cal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-2);
+}
+
+.cal-month {
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.cal-nav {
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.cal-nav:hover {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+.cal-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+}
+
+.cal-cell {
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+}
+
+.cal-weekday {
+  height: 32px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.cal-weekdays .cal-weekday:first-child {
+  color: var(--text-danger);
+}
+
+.cal-day {
+  position: relative;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.cal-day--today {
+  font-weight: 800;
+  color: var(--text-accent);
+}
+
+.cal-day--range {
+  background: rgba(0, 122, 255, 0.14);
+}
+
+.cal-day--start,
+.cal-day--end {
+  background: var(--accent);
+  color: #ffffff;
+  font-weight: 700;
+  border-radius: 50%;
+}
+
+.cal-day--in-trip.cal-day--start {
+  border-radius: 50% 0 0 50%;
+}
+
+.cal-day--in-trip.cal-day--end {
+  border-radius: 0 50% 50% 0;
+}
+
+.calendar-hint {
+  margin: var(--space-3) 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.search-input {
+  width: 100%;
+  min-height: var(--tap-min);
+  margin-bottom: var(--space-3);
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--page-bg);
+  font-size: 15px;
+  font-family: inherit;
+}
+
+.search-input:focus {
+  outline: none;
+  border-color: var(--accent);
+  background: var(--surface);
+}
+
+.pick-empty {
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.cal-day--disabled {
+  color: var(--disabled);
+  cursor: not-allowed;
+}
+
+/* ==========================================================================
+   6. 일정 화면: 헤더 · 빠른 메뉴 · 지도 · 타임라인 · 일정 추가 창  [SCHEDULE] [INVITE] [QUICK-MENU] [DAY-MAP] [TIMELINE] [SCHEDULE-FORM]
+   ========================================================================== */
+
+.app-top {
+  position: sticky;
+  /* 위에 SHELL의 고정 상단바(TOPBAR)가 떠 있어서 60px만큼 더 밀어낸다. :root가 이미 안전영역만큼
+     body를 밀어내 둔 상태라 --shell-top-h(60px + 안전영역)를 그대로 쓰면 안전영역이 두 번 들어간다 —
+     그래서 안전영역을 뺀 순수 아이콘 줄 높이(60px)만 margin-top/top에 더한다. */
+  margin-top: 60px;
+  top: 60px;
+  z-index: 20;
+  width: 100%;
+  max-width: var(--content-max);
+  margin-inline: auto;
+  background: var(--surface-blue);
+  border-bottom: 1px solid var(--border);
+  padding-top: env(safe-area-inset-top); /* 노치를 피해 헤더·빠른 메뉴를 아래로 밀어낸다 (배경은 노치 뒤까지 그대로 채워진다) */
+}
+
+/* [SCHEDULE-HEADER] 일정 헤더 (← · 여행 제목 · 날짜 · D-day) */
+.app-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5) var(--space-2);
+}
+
+.trip-title-group {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* [QUICK-MENU] 빠른 메뉴 (교통편 · 숙소) - 여행지갑·가계부는 SHELL의 하단 탭(MYTRIP-BOTTOMTABS)으로 옮겨갔다 */
+.quick-menu {
+  display: flex;
+  justify-content: flex-end; /* 오른쪽 정렬 - 왼쪽은 헤더의 여행 제목/D-day 쪽 여백으로 비워 둔다 */
+  gap: var(--space-2);
+  padding: var(--space-2) var(--space-5) var(--space-3);
+}
+
+/* 흰 카드 위에 글자 + (교통편만) ▼로 "눌러서 펼친다"는 느낌을 주는 버튼들 */
+.quick-menu-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 40px;
+  padding-inline: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.quick-menu-btn:hover,
+.quick-menu-btn:focus-visible,
+.quick-transport-trigger[aria-expanded="true"] {
+  border-color: var(--accent);
+  color: var(--text-accent);
+}
+
+/* "교통편" 버튼에만 붙는 펼침 표시(기차/버스/선박 목록, app.js#openTransportMenu) */
+.quick-transport-trigger-caret {
+  margin-left: 2px;
+  color: var(--text-muted);
+  font-size: 9px;
+  transition: transform 0.15s ease;
+}
+
+.quick-transport-trigger[aria-expanded="true"] .quick-transport-trigger-caret {
+  color: var(--text-accent);
+  transform: rotate(180deg);
+}
+
+/* "교통편" 버튼 아래로 펼쳐지는 드롭다운(app.js#openTransportMenu) - body에 직접 붙고 position: fixed로
+   버튼의 실제 화면 좌표에 맞춘다(.quick-menu의 overflow-x: auto 때문에 그 안에 두면 세로로 잘린다).
+   expenseForm.js/schedule.js의 Day 드롭다운과 같은 시각 언어(흰 목록, 그림자)를 쓴다. */
+.quick-transport-list {
+  position: fixed;
+  z-index: var(--z-modal);
+  width: max-content;
+  min-width: 140px;
+  margin: 0;
+  padding: var(--space-2) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  list-style: none;
+}
+
+.quick-transport-option {
+  padding: 10px var(--space-4);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.quick-transport-option:hover {
+  background: var(--surface-muted);
+}
+
+/* [INVITE-MODAL] 초대 창 (여는 곳은 SHELL의 MYTRIP-MENU '여행 공유' 항목, tripShell.js) */
+.invite-modal {
+  max-width: 400px;
+}
+
+.invite-status {
+  margin: 0 0 var(--space-3);
+  color: var(--text-soft);
+  font-size: 14px;
+}
+
+.invite-status--error {
+  color: var(--text-danger);
+}
+
+.invite-link-box {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.invite-link {
+  margin-bottom: 0;
+  border-radius: var(--radius-sm);
+  font-size: 13px;
+}
+
+.invite-kakao-btn {
+  width: 100%;
+  min-height: var(--tap-min);
+  margin-bottom: var(--space-4);
+  border: 0;
+  border-radius: var(--radius-pill);
+  background: var(--brand-kakao);
+  color: var(--brand-kakao-text);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.trip-title {
+  min-width: 0;
+  margin: 0;
+  padding-inline: var(--space-2);
+  overflow: hidden;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: var(--tap-min);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* [SCHEDULE-HEADER] 여행 날짜 (여행 제목 아래, "2026.11.11~2026.12.12") */
+.trip-dates {
+  margin: 0;
+  padding-inline: var(--space-2);
+  overflow: hidden;
+  color: var(--text-soft);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dday-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 14px;
+  border-radius: var(--radius-pill);
+  /* 메인 화면 트립카드의 D-day 배지와 같은 파스텔 블루/흰 글자 (--dday-pastel-bg/-ink) */
+  background: var(--dday-pastel-bg);
+  color: var(--dday-pastel-ink);
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.app-header .dday-badge {
+  margin-left: auto;
+}
+
+/* [SCHEDULE-FORM] 일정 추가·수정 창 (schedule.js가 body에 직접 붙인다, expenseForm.js와 같은 방식).
+   "장소 추가"·"메모 추가" 팝업 두 개가 이 전체화면 창 하나로 합쳐졌다: 위부터 Day·시간 한 줄, 장소 검색
+   (포커스하면 그 아래에 지도가 나오고 메모는 밀려 내려간다), 메모, 사진 순서다. 취소/삭제/저장 버튼은
+   본문이 스크롤되거나 지도가 펼쳐져도 항상 화면 아래에 고정된다(.schedule-form-footer가 스크롤 밖에 있다). */
+
+.schedule-form-overlay {
+  padding: 0;
+  align-items: stretch;
+}
+
+.schedule-form-sheet {
+  /* 일정 화면(.app-top/.timeline)과 같은 폭으로 맞춘다 - .budget-shell/.wallet-shell/.lodging-shell 등
+     다른 전체화면 페이지들과 똑같이 --content-max로 가운데 좁혀서, 넓은 화면에서도 이 창이 방금 있던
+     일정 화면과 같은 카드 폭으로 보이게 한다. */
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--content-max);
+  height: 100%;
+  margin-inline: auto;
+  background: var(--page-bg-blue);
+}
+
+.schedule-form-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  padding-top: calc(var(--space-4) + env(safe-area-inset-top)); /* 이 창은 전체화면(overlay가 padding:0)이라 노치를 직접 피해야 한다 */
+  background: var(--surface-blue);
+  border-bottom: 1px solid var(--border);
+}
+
+.schedule-form-close {
+  flex-shrink: 0;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.schedule-form-close:hover,
+.schedule-form-close:focus-visible {
+  background: var(--surface-muted);
+}
+
+.schedule-form-title {
+  flex: 1;
+  min-width: 0;
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+}
+
+.schedule-form-body {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-5);
+}
+
+/* Day(날짜)·시간 한 줄: 날짜 글자 자체를 누르면 Day 목록이 뜨고, 시간은 오른쪽 끝에 붙는다
+   (ex. "2026-11-14 ...... 시간 00:00") - 예전처럼 "날짜" 글자 라벨은 따로 붙이지 않는다. */
+.schedule-form-daytime {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.schedule-day-picker {
+  position: relative;
+}
+
+.schedule-day-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap-min);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.schedule-day-trigger:hover,
+.schedule-day-trigger:focus-visible {
+  border-color: var(--accent);
+}
+
+/* 숙소 일정은 체크인 날짜가 곧 Day라서 날짜를 바꾸지 못한다 (schedule.js의 hideDate) */
+.schedule-day-trigger:disabled {
+  cursor: default;
+  opacity: 0.7;
+}
+
+.schedule-day-caret {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.schedule-day-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 1;
+  width: max-content;
+  min-width: 200px;
+  max-height: 240px;
+  margin: 0;
+  padding: var(--space-2) 0;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  list-style: none;
+}
+
+.schedule-day-option {
+  padding: 8px var(--space-3);
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.schedule-day-option:hover,
+.schedule-day-option--active {
+  background: var(--surface-muted);
+}
+
+.schedule-time-group {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+
+.schedule-time-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-soft);
+}
+
+.schedule-time-group input[type="time"] {
+  min-height: var(--tap-min);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-family: inherit;
+}
+
+/* 장소 검색: 포커스하면 이 입력칸 바로 아래에 지도(.schedule-place-map-wrap)가 나타나고, 그만큼 메모칸이
+   아래로 밀린다(DOM 순서만으로 - 별도 레이아웃 계산이 필요 없다). */
+.schedule-place-map-wrap {
+  margin-top: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.schedule-place-results {
+  margin: 0;
+  padding: var(--space-2) 0;
+  max-height: 160px;
+  overflow-y: auto;
+  list-style: none;
+  border-bottom: 1px solid var(--border);
+}
+
+.schedule-place-results:empty {
+  display: none;
+  border-bottom: none;
+}
+
+.schedule-place-result {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px var(--space-3);
+  cursor: pointer;
+}
+
+.schedule-place-result:hover {
+  background: var(--surface-muted);
+}
+
+.schedule-place-result-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.schedule-place-result-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.schedule-place-status {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.schedule-place-status:empty {
+  display: none;
+}
+
+.schedule-place-map {
+  height: 220px;
+}
+
+/* 사진 썸네일을 누르면 전체화면으로 확인할 수 있다 (schedule.js의 photo viewer) */
+.image-thumb img {
+  cursor: pointer;
+}
+
+.schedule-photo-viewer-overlay {
+  padding: 0;
+  align-items: stretch;
+  z-index: var(--z-alert); /* SCHEDULE-FORM 위에 겹쳐서 뜬다 */
+  background: rgba(0, 0, 0, 0.85);
+}
+
+.schedule-photo-viewer {
+  position: relative;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 100%;
+}
+
+.schedule-photo-viewer img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+
+.schedule-photo-viewer-close {
+  position: absolute;
+  top: calc(var(--space-4) + env(safe-area-inset-top));
+  right: var(--space-4);
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #ffffff;
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.schedule-form-footer {
+  flex-shrink: 0;
+  padding: var(--space-4) var(--space-5);
+  padding-bottom: calc(var(--space-4) + env(safe-area-inset-bottom));
+  background: var(--surface-blue);
+  border-top: 1px solid var(--border);
+}
+
+/* [DAY-MAP] 지도 (빠른 메뉴와 Day 목록 사이). .app-top 안에 있어서 스크롤해도 함께 붙어 있다 */
+
+.day-map {
+  border-top: 1px solid var(--border);
+}
+
+/* 접기/펼치기: 높이 0fr ↔ 1fr 전환으로 부드럽게 (지도 자체의 크기는 그대로라 접었다 펼쳐도 지도가 깨지지 않는다) */
+.day-map-body {
+  display: grid;
+  grid-template-rows: 1fr;
+  transition: grid-template-rows 0.28s ease;
+}
+
+.day-map[data-open="false"] .day-map-body {
+  grid-template-rows: 0fr;
+}
+
+.day-map-inner {
+  min-height: 0;
+  overflow: hidden;
+}
+
+.day-map[data-open="false"] .day-map-inner {
+  visibility: hidden;
+  transition: visibility 0s 0.28s;
+}
+
+.day-map-canvas {
+  height: clamp(140px, 24vh, 260px);
+  background: var(--surface-muted);
+}
+
+.day-map-status {
+  margin: 0;
+  padding: 6px var(--space-5);
+  font-size: 12px;
+  color: var(--text-muted);
+  border-top: 1px solid var(--border);
+}
+
+/* 지도 아래 접기 손잡이: 가운데의 ︿ 모양을 누르면 지도가 접히고(﹀), 다시 누르면 펼쳐진다 */
+.day-map-handle {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  height: 36px;
+  border: none;
+  background: var(--surface-blue);
+  cursor: pointer;
+}
+
+.day-map-chevron {
+  width: 12px;
+  height: 12px;
+  margin-top: 6px;
+  border-top: 3px solid var(--disabled);
+  border-left: 3px solid var(--disabled);
+  border-radius: 2px;
+  transform: rotate(45deg);
+  transition: transform 0.28s ease, margin 0.28s ease;
+}
+
+.day-map[data-open="false"] .day-map-chevron {
+  margin-top: -6px;
+  transform: rotate(225deg);
+}
+
+.day-map-handle:hover .day-map-chevron,
+.day-map-handle:focus-visible .day-map-chevron {
+  border-color: var(--accent);
+}
+
+/* 지도 위 번호 마커. 위치는 JS가 정하고(가운데가 좌표), 스크롤로 맨 위에 온 일정의 마커는 커진다 */
+.day-pin {
+  position: absolute;
+  width: 0;
+  height: 0;
+  cursor: pointer;
+}
+
+.day-pin-dot {
+  position: absolute;
+  left: -14px;
+  top: -14px;
+  width: 28px;
+  height: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--pin-color);
+  box-shadow: var(--shadow-md);
+  color: var(--pin-ink, #ffffff);
+  font-size: 13px;
+  font-weight: 800;
+  line-height: 1;
+  transition: transform 0.35s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.day-pin.is-active {
+  z-index: 1;
+}
+
+.day-pin.is-active .day-pin-dot {
+  transform: scale(1.7);
+}
+
+/* 커진 마커 둘레로 퍼지는 물결 */
+.day-pin.is-active .day-pin-dot::after {
+  content: "";
+  position: absolute;
+  inset: -4px;
+  border: 2px solid var(--pin-color);
+  border-radius: 50%;
+  animation: day-pin-pulse 1.6s ease-out infinite;
+}
+
+@keyframes day-pin-pulse {
+  from {
+    transform: scale(1);
+    opacity: 0.8;
+  }
+  to {
+    transform: scale(1.9);
+    opacity: 0;
+  }
+}
+
+/* [TIMELINE] Day별 일정 목록과 카드 */
+.timeline {
+  width: 100%;
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding: var(--space-5);
+  /* 마지막 카드도 화면 맨 위까지 올라올 수 있게 dayMap.js가 계산해 넣는 아래 여백(지도의 번호 포커스용) +
+     SHELL의 고정 하단 탭바(57px, 안전영역 제외 - :root가 이미 안전영역만큼 밀어내 둔 상태다)를 더한다 */
+  padding-bottom: calc(var(--space-5) + var(--timeline-tail, 0px) + 57px);
+  min-height: 40vh;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.timeline-empty {
+  text-align: center;
+  color: var(--text-muted);
+  padding: 64px 20px;
+  font-size: 14px;
+}
+
+.date-group {
+  display: flex;
+  flex-direction: column;
+}
+
+.date-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0;
+}
+
+.day-badge {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.date-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* "장소 추가"·"메모 추가" 두 버튼이 하나("일정 추가")로 합쳐졌다 - .day-add-btn이 이제 이 줄의 유일한
+   버튼이라 flex:1이 옛날 두 버튼을 합친 만큼의 가로폭을 그대로 채운다(SCHEDULE-FORM 전체화면 창은
+   schedule.js가 연다). */
+.day-actions {
+  display: flex;
+  gap: var(--space-3);
+  margin-top: var(--space-3);
+}
+
+.day-add-btn {
+  flex: 1;
+  min-height: var(--tap-min);
+  padding-inline: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.day-add-btn:hover,
+.day-add-btn:focus-visible {
+  border-color: var(--accent);
+  color: var(--text-accent);
+}
+
+.date-items {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+/* 일정이 없는 Day도 항상 그리므로(다른 Day에서 드래그해 올 자리, timelineDrag.js), 평소엔 이 여백조차
+   안 보이게 없앤다 - 드래그 중일 때만 아래 규칙이 점선 칸으로 보여준다. */
+.date-items:empty {
+  margin-top: 0;
+}
+
+/* [TIMELINE-DRAG] 드래그로 순서를 바꾸는 동안: 비어 있는 Day도 점선 칸으로 보여서 거기에도 놓을 수 있다는
+   걸 알려주고, 지금 손가락/마우스가 올라와 있는 Day는 조금 더 진하게 강조한다. */
+#timeline.is-reordering .date-items:empty {
+  margin-top: var(--space-2);
+  min-height: 48px;
+  border: 2px dashed var(--border);
+  border-radius: var(--radius-md);
+}
+
+#timeline.is-reordering .date-items.date-items--drop-target {
+  outline: 2px dashed var(--accent);
+  outline-offset: 2px;
+  border-radius: var(--radius-md);
+}
+
+/* 아이템 아이콘들을 이어주는 세로선: 카드는 배경이 있어 선을 덮으므로, 카드 사이 간격에서만 보인다.
+   아이콘 크기(31px, 기존 44px의 70%)의 가운데에 오도록 left를 같이 맞춰 둔다: 카드의 왼쪽 패딩(--space-4,
+   16px) + 아이콘 반지름(15.5px). */
+.date-items::before {
+  content: "";
+  position: absolute;
+  left: 31.5px;
+  top: 0;
+  bottom: 0;
+  width: 2px;
+  background: var(--border);
+  z-index: 0;
+}
+
+/* [TIMELINE-DRAG] 일반 카드(장소·메모)만 감싸는 래퍼: 길게 눌러 순서 바꾸기·가로 스와이프 삭제가
+   여기서 일어난다(timelineDrag.js). 항공편·숙소는 이 래퍼 없이 .timeline-item 그대로 나온다. */
+.timeline-item-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+}
+
+/* 카드 뒤에 숨어 있다가, 카드가 스와이프로 왼쪽으로 밀려난 만큼만 드러난다(별도 크기 계산 없이 겹침만으로 표현).
+   카드와 완전히 같은 크기로 딱 맞춰 두면(inset: 0) 둥근 모서리에서 안티앨리어싱 때문에 가만히 있을 때도
+   카드 테두리를 따라 빨간 선이 아주 얇게 비치는 경우가 있어서(래퍼의 overflow: hidden 클리핑과 카드의
+   box-shadow가 만나는 경계), 카드보다 사방으로 조금 작게 둬서 여유(안전 여백)를 준다 - 실제로 스와이프할
+   때는 이 정도 차이는 보이지 않는다. */
+.item-delete-bg {
+  position: absolute;
+  inset: 3px;
+  border-radius: calc(var(--radius-md) - 3px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: var(--space-5);
+  background: var(--danger);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  z-index: 0;
+}
+
+/* 드래그로 순서를 바꾸는 동안엔 카드 사이 거리 표시가 낡은 자리에 남아 어색해 보이니 잠깐 숨긴다
+   (다음 렌더에서 새 순서에 맞게 다시 나온다) */
+#timeline.is-reordering .item-distance {
+  visibility: hidden;
+}
+
+.timeline-item-wrap-placeholder {
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+}
+
+.timeline-item {
+  position: relative;
+  z-index: 1;
+  scroll-margin-top: calc(var(--app-top-h, 200px) + var(--space-3)); /* 지도 마커를 눌러 카드로 이동할 때 상단 영역에 가려지지 않게 */
+  display: grid;
+  grid-template-columns: 31px 1fr;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+
+/* [TIMELINE-DRAG] 일반 카드(data-plain="1")의 제스처 상태.
+   touch-action: pan-y - 세로 스크롤은 브라우저에게 그대로 맡기고, 가로 움직임만 JS가 가로채 스와이프로 쓴다.
+   순서 바꾸기는 이제 오른쪽 끝의 드래그 핸들(.item-drag-handle)에서만 시작하므로 카드 자체를 길게 누를
+   필요가 없다 - 핸들 자리만큼 오른쪽 패딩을 더 둔다. */
+.timeline-item[data-plain="1"] {
+  touch-action: pan-y;
+  padding-right: 40px;
+}
+
+/* 드래그 핸들(≡, 3줄 아이콘): 누르는 즉시(길게 누르기 없이) 순서 바꾸기가 시작된다(timelineDrag.js). */
+.item-drag-handle {
+  position: absolute;
+  right: 4px;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  color: var(--text-faint);
+  cursor: grab;
+  touch-action: none; /* 잡자마자 바로 드래그라 스크롤과 다툴 일이 없다 - 전부 JS가 가져간다 */
+}
+
+.item-drag-handle:hover,
+.item-drag-handle:focus-visible {
+  color: var(--text-muted);
+}
+
+.timeline-item.is-swiping {
+  transition: none; /* 손가락을 그대로 따라가야 해서, 스냅백/삭제 애니메이션에서만 transition을 켠다 */
+}
+
+.timeline-item-wrap.is-dragging {
+  overflow: visible; /* 드는 동안의 그림자는 래퍼의 overflow: hidden에 잘리면 안 된다 */
+  z-index: var(--z-modal); /* position: fixed로 뜨는 동안 헤더·지도(.app-top, z-index 20)와 SHELL 위로 보이게 */
+  box-shadow: var(--shadow-md), 0 10px 24px rgba(0, 0, 0, 0.18);
+  border-radius: var(--radius-md);
+}
+
+.timeline-item-wrap.is-dragging .timeline-item {
+  transform: scale(1.02);
+}
+
+/* 같은 Day 안, 바로 다음 일정과의 지도상 직선거리 (예: "1.2km"). 두 일정 모두 위치(lat/lng)가 있을 때만
+   렌더링된다(app.js#renderDateItems) - 위치를 확인할 수 없으면 이 칸 자체가 나오지 않는다.
+   아이콘 칸(위 grid-template-columns의 첫 칸)과 같은 폭·같은 왼쪽 여백을 줘서 아이콘을 잇는 세로선 위,
+   두 아이콘 "사이"에 놓이게 한다. */
+.item-distance {
+  position: relative;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 31px;
+  margin-left: var(--space-4);
+  color: var(--text-warm-muted);
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.item-icon {
+  position: relative;
+  width: 31px;
+  height: 31px;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #ffffff;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+}
+
+/* 번호가 붙은 일정: 아이콘 자리에 지도 마커와 같은 색·번호의 원이 들어간다.
+   색이 파스텔이라 글자색을 흰색으로 고정하면 밝은 색(머스터드·오커 등)에서 안 읽혀서,
+   색마다 미리 정해 둔 대비색(--pin-ink, dayMap.js가 --route-N-ink에서 읽어 붙인다)을 쓴다. */
+.item-icon--num {
+  background: var(--pin-color);
+  color: var(--pin-ink, #ffffff);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.item-body {
+  min-width: 0;
+}
+
+.item-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: var(--space-2);
+}
+
+.item-title {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.item-time {
+  margin-top: 2px;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.item-meta {
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.item-memo {
+  margin-top: 6px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.item-images {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+  overflow-x: auto;
+}
+
+.item-thumb {
+  width: 56px;
+  height: 56px;
+  flex-shrink: 0;
+  border-radius: var(--radius-sm);
+  object-fit: cover;
+  background: var(--page-bg);
+}
+
+/* ==========================================================================
+   7. 항공편  [FLIGHT]
+   ========================================================================== */
+
+.flight-form .form-field {
+  margin-bottom: var(--space-5);
+}
+
+.flight-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.flight-chip {
+  min-height: 36px;
+  padding-inline: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.flight-chip--active {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #ffffff;
+}
+
+.flight-chip--day {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: var(--tap-min);
+  padding-inline: var(--space-4);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  text-align: left;
+}
+
+.flight-chip--day span {
+  font-size: 13px;
+  font-weight: 500;
+  opacity: 0.85;
+}
+
+/* Day는 세로로 나열하고, 기간이 길어지면 모달 본문이 스크롤된다 */
+
+.flight-chips--days {
+  flex-direction: column;
+  flex-wrap: nowrap;
+}
+
+.flight-empty {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* 2단계(항공사 + 편명) 안의 작은 구역 제목 */
+.flight-field-label {
+  margin: 0 0 var(--space-2);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.flight-field-label--spaced {
+  margin-top: var(--space-5);
+}
+
+.flight-no-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.flight-no-prefix {
+  flex-shrink: 0;
+  min-width: 52px;
+  min-height: var(--tap-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--radius-sm);
+  background: var(--page-bg);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.flight-input {
+  min-width: 0;
+  min-height: var(--tap-min);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.flight-no-row .flight-input {
+  flex: 1;
+}
+
+.flight-hint {
+  margin: var(--space-2) 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-accent);
+}
+
+.flight-hint--muted {
+  margin-top: var(--space-3);
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.flight-lookup-status {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0 0 var(--space-5);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--page-bg);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.flight-lookup-status strong {
+  color: var(--text);
+}
+
+.flight-lookup-status--ok strong {
+  color: var(--success);
+}
+
+.flight-lookup-status--warn strong {
+  color: var(--warning);
+}
+
+.fd-role-col {
+  flex: 0 0 48px;
+  padding-top: 14px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-accent);
+}
+
+.fd-fields {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.flight-time-big {
+  font-size: 22px;
+  font-weight: 800;
+}
+
+#flight-step-confirm .fd-stop,
+#flight-step-confirm .fd-duration {
+  gap: var(--space-3);
+}
+
+#flight-step-confirm .fd-duration {
+  margin: 0 0 var(--space-2);
+}
+
+#flight-step-confirm .fd-duration .flight-hint {
+  margin: 0;
+}
+
+.flight-detail {
+  max-width: 400px;
+}
+
+.flight-detail .wizard-step-label {
+  margin-bottom: 2px;
+}
+
+.flight-detail-body {
+  margin: var(--space-4) 0 var(--space-5);
+}
+
+.fd-stop {
+  display: flex;
+  gap: var(--space-4);
+  align-items: flex-start;
+}
+
+.fd-time {
+  flex: 0 0 76px;
+  font-size: 26px;
+  font-weight: 800;
+  line-height: 1.1;
+}
+
+.fd-time sup {
+  margin-left: 2px;
+  font-size: 12px;
+  color: var(--text-danger);
+}
+
+.fd-place {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.fd-place strong {
+  font-size: 16px;
+  color: var(--text);
+}
+
+.fd-role {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-accent);
+}
+
+.fd-duration {
+  display: flex;
+  align-items: center;
+  gap: var(--space-4);
+  margin: var(--space-2) 0;
+}
+
+.fd-line {
+  flex: 0 0 76px;
+  height: 28px;
+  background: linear-gradient(var(--border), var(--border)) center / 2px 100% no-repeat;
+}
+
+.fd-duration-text {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+/* [FLIGHT] 선택 화면(choice): 항공권 사진으로 등록(위) / 직접 등록(아래) */
+
+#flight-step-choice .flight-ticket-card {
+  margin-top: 0; /* 이 화면에서는 카드가 맨 위 요소라서, 원래 위 여백(아래 규칙)을 지운다 */
+}
+
+.flight-choice-divider {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  margin: var(--space-5) 0;
+  color: var(--text-muted);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.flight-choice-divider::before,
+.flight-choice-divider::after {
+  content: "";
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+
+/* [FLIGHT] 선택 화면의 "항공권 사진으로 등록" 카드 (위 규칙이 이 화면 안에서만 위 여백을 지운다) */
+
+.flight-ticket-card {
+  margin-top: var(--space-6);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.flight-ticket-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+}
+
+.flight-ticket-desc {
+  margin: var(--space-2) 0 var(--space-3);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.flight-ticket-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.flight-ticket-actions .btn {
+  flex: 1;
+}
+
+.flight-ticket-preview {
+  position: relative;
+  margin-top: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+}
+
+.flight-ticket-preview img {
+  display: block;
+  width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+}
+
+.flight-ticket-clear {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #ffffff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.flight-ticket-status {
+  margin: var(--space-3) 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-accent);
+}
+
+/* 읽거나 분석하는 중: 글자가 천천히 깜박인다 */
+.flight-ticket-status--busy {
+  animation: flight-ticket-pulse 1.4s ease-in-out infinite;
+}
+
+.flight-ticket-status--ok {
+  color: var(--success);
+}
+
+.flight-ticket-status--error {
+  color: var(--text-danger);
+}
+
+/* 항공권에서 자동으로 채운 값 위에 보여주는 안내 */
+.flight-autofill-notice {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-left: 3px solid var(--accent);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+@keyframes flight-ticket-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* [FLIGHT] 항공편 2단계(항공사·편명) 아래: API 키 연결 */
+
+.flight-api-box {
+  margin-top: var(--space-6);
+  padding: var(--space-4);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+}
+
+.flight-api-title {
+  margin: 0 0 var(--space-3);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.flight-api-title span {
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.flight-api-title .flight-api-state--on {
+  color: var(--success);
+}
+
+.flight-api-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.flight-api-row .flight-input {
+  flex: 1;
+}
+
+.flight-api-clear {
+  border: none;
+  background: transparent;
+  color: var(--text-danger);
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.flight-api-help {
+  margin: var(--space-3) 0 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.flight-api-help a {
+  color: var(--text-accent);
+}
+
+/* ==========================================================================
+   8. 숙소 (#/lodging/:id)  [LODGING]
+   일정 화면의 QUICK-MENU "숙소"에서 들어오는 새 화면(모달 아님, 가계부/여행지갑과 같은 구조).
+   화면 전체는 고정이다. 첫 화면이 곧 map(지도에서 찾기)이고, 숙소를 고르면 dates(체크인/체크아웃)로
+   넘어간다 - 검색+인기 숙소를 보여주던 list 화면은 없앴다(map·dates 두 하위 화면을 한 DOM에 두고
+   hidden으로 넘나든다).
+   ========================================================================== */
+
+.page[data-page="lodging"] {
+  position: fixed;
+  top: var(--shell-top-h); /* SHELL의 고정 상단바·하단탭바 사이로 비켜 앉는다 */
+  bottom: var(--shell-bottom-h);
+  left: 0;
+  right: 0;
+  max-width: none;
+  padding: 0;
+  overflow: hidden;
+}
+
+.lodging-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--content-max);
+  height: 100%;
+  margin-inline: auto;
+  background: var(--surface-blue);
+}
+
+/* 내용(← 버튼 · 제목 · 부제) 없이 빈 채로 남겨둔다 - SHELL(tripShell.js) 상단바가 그 역할을 대신한다
+   (lodging.js#pageHtml 주석 참고). 빈 상태에서도 여백/구분선만은 그대로 남긴다. */
+.lodging-header {
+  flex-shrink: 0;
+  padding: var(--space-4) var(--space-5); /* .page[data-page="lodging"]가 이미 SHELL 상단바 아래로 비켜 앉아 있어 별도 안전영역 여백은 필요 없다 */
+  background: var(--surface-blue);
+  border-bottom: 1px solid var(--border);
+}
+
+/* map · dates 두 하위 화면 공통: 헤더 아래 남은 공간을 모두 채우고, 각자 안에서 레이아웃한다 */
+.lodging-page {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+.lodging-status {
+  margin: 0 0 var(--space-3);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-muted);
+}
+
+.lodging-attribution {
+  margin: 0 var(--space-5) var(--space-2);
+  font-size: 11px;
+  color: var(--text-faint);
+  text-align: right;
+}
+
+/* ---- map: 지도에서 찾기(검색창은 상단, 지도는 하단) - 이제 이 화면이 곧 첫 화면이다.
+   검색 결과는 상단에 따로 목록으로 늘어놓지 않는다(여러 곳일 때 좁은 목록을 스크롤해야 하고,
+   1곳일 때는 아래 확인 바와 같은 정보가 중복 표시됐다) - 지도 위 핀으로만 보여주고 눌러서 고른다. ---- */
+
+.lodging-map-search {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5) 0;
+  background: var(--surface-blue);
+}
+
+/* 이 화면의 "검색" 버튼만 파스텔 블루로 - 다른 화면의 .btn-save(진한 --accent)는 그대로 둔다 */
+.lodging-map-search .btn-save {
+  background: var(--dday-pastel-bg);
+}
+
+.lodging-map-search-input {
+  flex: 1;
+  min-width: 0;
+  min-height: var(--tap-min);
+  padding: 10px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--page-bg);
+  font-size: 15px;
+  font-family: inherit;
+}
+
+.lodging-map-status {
+  flex-shrink: 0;
+  padding: 0 var(--space-5);
+}
+
+.lodging-map {
+  flex: 1;
+  min-height: 200px;
+}
+
+.lodging-map-confirm {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* "이 숙소 선택" 버튼만 파스텔 블루로 - 위 .lodging-map-search .btn-save(검색 버튼)와 같은 토큰이다 */
+.lodging-map-confirm .btn-save {
+  background: var(--dday-pastel-bg);
+}
+
+.lodging-map-confirm-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  overflow: hidden;
+  font-size: 14px;
+}
+
+.lodging-map-confirm-info span {
+  overflow: hidden;
+  font-size: 12px;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.lodging-map-confirm .btn {
+  flex-shrink: 0;
+}
+
+/* ---- dates: 체크인/체크아웃 (기존 위저드 달력과 같은 모양) ---- */
+
+.lodging-page[data-role="page-dates"] {
+  overflow-y: auto;
+  padding: var(--space-5);
+}
+
+.lodging-picked {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  margin-bottom: var(--space-4);
+  padding: var(--space-3) var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 15px;
+}
+
+.lodging-picked span {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.lodging-footer {
+  flex-shrink: 0;
+  padding: var(--space-4) var(--space-5); /* .page[data-page="lodging"]가 이미 SHELL 하단탭바 위로 비켜 앉아 있어 별도 안전영역 여백은 필요 없다 */
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+}
+
+/* ==========================================================================
+   9. 화면(라우트) 공통 · 메인 화면 · 초대 화면 · 로그인 화면  [MAIN] [INVITE-PAGE] [LOGIN]
+   ========================================================================== */
+
+.page {
+  width: 100%;
+  max-width: var(--content-max);
+  margin-inline: auto;
+  padding: var(--space-6) var(--space-5);
+}
+
+.page-title {
+  margin: 0 0 var(--space-3);
+  font-size: 22px;
+  font-weight: 800;
+}
+
+.page-note {
+  margin: 0 0 var(--space-4);
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* [COMMON-PAGE] 알림·설정 공용 화면(commonPages.js) - SHELL이 없는 보통 .page라 기본 패딩/세이프에어리어를
+   그대로 쓴다(main·login과 같은 처리, CLAUDE.md 세이프에어리어 설명 참고). */
+.simple-page-header {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-4);
+}
+
+.simple-page-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 800;
+}
+
+.simple-page-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* 설정 화면(#/settings) 맨 아래 버전 정보 - 단순 표시(클릭 동작 없음) */
+.simple-page-version {
+  margin: var(--space-4) 0 0;
+  color: var(--text-faint);
+  font-size: 12px;
+  text-align: center;
+}
+
+/* 설정 화면(#/settings) 안의 "개인정보 및 약관" 같은 섹션 제목 + 목록 묶음 */
+.simple-page-section {
+  margin-bottom: var(--space-4);
+}
+
+/* 섹션 제목은 눌러서 접고 펼치는 버튼이다(commonPages.js#toggleSection) - 기존 글자 크기/색은 그대로 두고
+   버튼 기본 스타일만 지운다 */
+.simple-page-section-title {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  width: 100%;
+  min-height: var(--tap-min);
+  margin: 0 0 var(--space-2);
+  padding: 0;
+  border: none;
+  background: transparent;
+  font-size: 13px;
+  font-weight: 700;
+  font-family: inherit;
+  color: var(--text-muted);
+  cursor: pointer;
+}
+
+.simple-page-section-caret {
+  display: flex;
+  color: var(--text-faint);
+  transition: transform 0.2s ease;
+}
+
+.simple-page-section-caret svg {
+  width: 16px;
+  height: 16px;
+}
+
+/* 펼친 상태면 ⌄가 위를 보게 180도 돌린다 */
+.simple-page-section-title[aria-expanded="true"] .simple-page-section-caret {
+  transform: rotate(180deg);
+}
+
+/* 섹션 안의 이용약관·개인정보처리방침 등 링크 목록 - 우측 슬라이드 메뉴의 .mytrip-menu를 그대로
+   재사용한다(새 리스트 레이아웃을 만들지 않는다, Conventions 참고) */
+.simple-page-list {
+  margin: 0 calc(var(--space-5) * -1);
+}
+
+/* [LEGAL-PAGE] 이용약관·개인정보처리방침(legalPages.js) - 초안이라는 안내(버전·시행 전) + 본문 */
+.legal-meta {
+  margin: 0 0 var(--space-5);
+  padding-bottom: var(--space-3);
+  border-bottom: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.legal-content h2 {
+  margin: var(--space-5) 0 var(--space-2);
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text-soft);
+}
+
+.legal-content section:first-child h2 {
+  margin-top: 0;
+}
+
+.legal-content p {
+  margin: 0 0 var(--space-3);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.legal-content ul {
+  margin: 0 0 var(--space-3);
+  padding-left: 20px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.legal-content li {
+  margin-bottom: 4px;
+}
+
+/* [MAIN-HEAD] 로고(왼쪽) + 계정·메뉴(오른쪽) */
+
+.main-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-5);
+}
+
+.main-logo {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Icon.png(login-icon.png와 같은 파일)은 흰색/옅은 하늘색 "R" 글자만 있어서, 로그인 화면처럼 하늘색
+   배경 위가 아닌 흰 배경 위에서는 그 자체로는 안 보인다 - accent색 사각형을 깔아 두고 그 위에 얹는다.
+   옆 글자는 아이콘과 겹치지 않게 "Routory" 전체를 그대로 쓴다(아이콘 R과 맞출 필요는 없다). */
+.main-logo-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius-sm);
+  background: var(--accent);
+  overflow: hidden;
+}
+
+.main-logo-icon img {
+  width: 70%;
+  height: 70%;
+  object-fit: contain;
+}
+
+.main-logo-text {
+  font-size: 19px;
+  font-weight: 800;
+}
+
+/* 메뉴(☰) 버튼: SHELL(tripShell.js)의 [MYTRIP-TOPBAR] 메뉴 버튼과 같은 .mytrip-icon-btn/--dark를
+   그대로 쓴다(별도 클래스 없음) - 컬러·크기·위치를 SHELL과 맞추기 위함, 그 CSS 참고 */
+
+.main-trips-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.main-section-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.main-section-title span {
+  margin-left: 4px;
+  font-size: 14px;
+  color: var(--text-muted);
+}
+
+.main-trips-head-actions {
+  display: flex;
+  flex-shrink: 0;
+  gap: var(--space-2);
+}
+
+.main-new-btn {
+  min-height: 36px;
+  padding-inline: var(--space-4);
+  border: 1px solid var(--accent);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text-accent);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.trip-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+  gap: var(--space-3);
+}
+
+/* [TRIP-CARD-SWIPE] 카드를 감싸서 스와이프 삭제를 담는다(일정 카드의 .timeline-item-wrap과 같은 원리) -
+   overflow: hidden으로 클리핑하고, 카드가 왼쪽으로 밀린 만큼만 뒤에 숨은 삭제 배경이 드러난다. */
+.trip-card-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+}
+
+/* .item-delete-bg와 같은 이유로 사방 3px만큼 안쪽에 둔다(카드의 둥근 모서리와 겹쳐서 생기는 안티앨리어싱
+   빨간 선을 피하기 위함 - CLAUDE.md의 [TIMELINE-DRAG] 설명 참고) */
+.trip-card-delete-bg {
+  position: absolute;
+  inset: 3px;
+  border-radius: calc(var(--radius-md) - 3px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: var(--space-5);
+  background: var(--danger);
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  z-index: 0;
+}
+
+.trip-card {
+  position: relative; /* .trip-card-delete-bg(absolute) 위에 뜨려면 스스로도 위치 지정 요소여야 한다 */
+  z-index: 1;
+  width: 100%;
+  /* .trip-cards가 grid라 기본 align-items: stretch로 .trip-card-wrap이 그 줄의 가장 큰 카드 높이만큼
+     늘어난다(카드마다 줄 수가 달라도 같은 줄의 카드 높이를 맞추는 원래 의도) - wrap의 자식인 이 카드도
+     height: 100%로 같이 늘어나야, 늘어난 자리를 카드 배경이 채우고 그 뒤의 삭제 배경이 비치지 않는다. */
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  color: inherit;
+  text-decoration: none;
+  touch-action: pan-y; /* 세로 스크롤은 브라우저에게 맡기고, 가로 스와이프만 JS가 가져간다 */
+}
+
+.trip-card:hover,
+.trip-card:focus-visible {
+  border-color: var(--accent);
+}
+
+.trip-card-main {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.trip-card-dest-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+}
+
+.trip-card-dest {
+  font-size: 17px;
+  font-weight: 800;
+}
+
+/* [MEMBERS] 카드에 함께 여행하는 동료(소셜 로그인 프로필 사진)를 겹쳐 보여준다 - tripMembers.js의
+   .member-avatar와 같은 구조지만, 민트색 헤더가 아니라 흰 카드 위에 놓여서 테두리 색을 다르게 쓴다. */
+.trip-card-avatars {
+  display: inline-flex;
+}
+
+.trip-card-avatar {
+  position: relative;
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  margin-left: -8px;
+  overflow: hidden;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--avatar-pastel-bg);
+}
+
+.trip-card-avatar:first-child {
+  margin-left: 0;
+}
+
+.trip-card-avatar-initial,
+.trip-card-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.trip-card-avatar-initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--avatar-pastel-ink);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.trip-card-avatar img {
+  object-fit: cover;
+}
+
+.trip-card-avatar-more {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  margin-left: -8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 2px solid var(--surface);
+  border-radius: 50%;
+  background: var(--surface-muted);
+  color: var(--text-soft);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.trip-card-title {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.trip-card-period {
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+/* 파스텔 톤 정책(Conventions 참고): 새로 꾸미는 장식 색이라 기존 --danger(진한 빨강)
+   대신 파스텔 톤을 쓴다 - 일정 화면 헤더의 D-day(.app-header .dday-badge)는 그대로 두고 이 카드에만 적용한다. */
+.trip-card-dday {
+  background: var(--dday-pastel-bg);
+  color: var(--dday-pastel-ink);
+}
+
+/* 지난 여행은 배경만 파스텔 회색으로 바꾸고, 글자는 위 .trip-card-dday의 흰 글자(--dday-pastel-ink)를 그대로 물려받는다 */
+.trip-card-dday--past {
+  background: var(--dday-pastel-gray-bg);
+}
+
+.empty-state {
+  padding: var(--space-6) var(--space-4);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  text-align: center;
+}
+
+.empty-title {
+  margin: 0 0 4px;
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.empty-desc {
+  margin: 0 0 var(--space-4);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* [MAIN-ACCOUNT] 로고 옆(MAIN-HEAD 오른쪽)의 계정 아이콘·이름 + 메뉴 버튼 */
+
+.main-account {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.main-avatar {
+  position: relative;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--surface-muted);
+}
+
+.main-avatar-initial,
+.main-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.main-avatar-initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.main-avatar img {
+  object-fit: cover;
+}
+
+/* [MAIN-MENU] 메인 화면 전용 우측 슬라이드 메뉴 - SHELL의 .mytrip-drawer 등을 그대로 재사용하고,
+   이 메뉴에서만 달라야 하는 부분만 .main-menu로 범위를 좁혀 얹는다(mainPage.js#ensureMenu 참고). */
+
+/* 닫기(x) 버튼: SHELL의 기본 44px(--tap-min)보다 작게 - 안의 svg 크기(18px)는 마크업에서 직접 줄인다 */
+.main-menu .main-menu-close {
+  width: 28px;
+  height: 28px;
+}
+
+/* 로그아웃 글자색: SHELL의 --danger(진한 빨강) 대신 파스텔 톤 정책(아래 참고)의 --danger-pastel을 쓴다 */
+.main-menu .mytrip-menu-logout button {
+  color: var(--danger-pastel);
+}
+
+/* 패널 헤드 바로 아래 프로필 줄: 왼쪽 로그인 이름, 오른쪽 프로필 아이콘 */
+.main-menu-profile {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-3) var(--space-5) var(--space-4);
+  border-bottom: 1px solid var(--border);
+}
+
+.main-menu-profile-name {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+/* 프로필 아이콘: 헤더의 .main-avatar(28px)보다 50% 더 크게(54px) - 이 줄에서 가장 먼저 눈에
+   띄어야 하는 요소라서다. 구조는 .main-avatar와 같다(profileAvatarHtml이 함께 만든다):
+   이름 첫 글자를 깔아 두고 사진이 있으면 그 위에 얹는다. */
+.main-menu-profile-avatar {
+  position: relative;
+  flex-shrink: 0;
+  width: 54px;
+  height: 54px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--surface-muted);
+}
+
+.main-menu-profile-avatar-initial,
+.main-menu-profile-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.main-menu-profile-avatar-initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-soft);
+  font-size: 22px;
+  font-weight: 700;
+}
+
+.main-menu-profile-avatar img {
+  object-fit: cover;
+}
+
+/* [TRIP-SETUP] / [TRIP-IMPORT-MODAL] 메인 화면에서 여는 두 팝업(+ 새 여행 · 여행 가져오기): 팝업 배경을
+   메인 화면 배경(--page-bg-blue)과 같게 맞추고, 안의 파란 강조색(--accent)들도 파스텔 톤(--dday-pastel-bg,
+   이미 있는 "파스텔 블루" 토큰을 그대로 재사용)으로 바꾼다. 흰색(버튼 글자 등)은 그대로 둔다.
+   둘 다 .modal.wizard/.wizard-footer를 쓰지만 그 클래스는 FLIGHT/LODGING 등 다른 위저드와도 공유해서,
+   전역이 아니라 #trip-modal-overlay/#trip-import-overlay로 딱 이 두 팝업만 좁혀 건다 - 두 팝업이 똑같이
+   쓰는 규칙(.modal, .wizard-footer)은 한 선택자에 같이 묶고, 한쪽에만 있는 요소(TRIP-SETUP의 도시 검색
+   목록, TRIP-IMPORT-MODAL의 탭)는 각자 따로 둔다. */
+#trip-modal-overlay .modal,
+#trip-import-overlay .modal {
+  background: var(--page-bg-blue);
+}
+
+#trip-modal-overlay .wizard-footer,
+#trip-import-overlay .wizard-footer {
+  background: var(--page-bg-blue);
+}
+
+/* 두 팝업의 파란 "확인/분석하기" 버튼(.btn-save) - 글자는 흰색 그대로, 배경만 파스텔 블루로 */
+#trip-modal-overlay .btn-save,
+#trip-import-overlay .btn-save {
+  background: var(--dday-pastel-bg);
+}
+
+/* TRIP-SETUP: 단계 표시("1단계 · 여행지 입력") */
+#trip-modal-overlay .wizard-step-label {
+  color: var(--dday-pastel-bg);
+}
+
+/* TRIP-SETUP: 도시 선택 버튼(선택 전/후) */
+#trip-modal-overlay .pick-btn {
+  border-color: var(--dday-pastel-bg);
+  color: var(--dday-pastel-bg);
+}
+
+#trip-modal-overlay .pick-btn--selected {
+  background: var(--dday-pastel-bg);
+}
+
+/* TRIP-SETUP: 선택된 도시 행의 강조 테두리·배경(연한 파란 틴트) */
+#trip-modal-overlay .pick-item--selected {
+  border-color: var(--dday-pastel-bg);
+  background: rgba(140, 180, 255, 0.12);
+}
+
+/* TRIP-IMPORT-MODAL: 파일/텍스트/사진 탭 중 고른 탭 */
+#trip-import-overlay .trip-import-tab--active {
+  border-color: var(--dday-pastel-bg);
+  background: var(--dday-pastel-bg);
+}
+
+/* [INVITE-PAGE] 초대 화면 (#/invite/:code) */
+
+.invite-page {
+  max-width: 360px;
+  margin: var(--space-6) auto 0;
+  text-align: center;
+}
+
+.invite-page-icon {
+  margin-bottom: var(--space-3);
+  font-size: 40px;
+}
+
+.invite-page .btn {
+  display: inline-block;
+  margin: var(--space-2) var(--space-1) 0;
+  text-decoration: none;
+}
+
+/* [LOGIN] 로그인 화면 */
+
+/* 화면 크기에 맞춰 억지로 늘리지 않고(왜곡 없이) 세로 사진 비율 그대로 화면을 덮도록 cover를 쓴다 —
+   .page는 원래 --content-max로 폭이 제한되지만, 로그인 화면만은 뷰포트 전체 폭으로 벗어나 배경이 화면
+   가장자리까지 자연스럽게 이어지게 한다. 안의 콘텐츠(.login)는 그대로 360px로 가운데 정렬된다. */
+.page[data-page="login"] {
+  position: relative;
+  width: 100vw;
+  max-width: none;
+  margin-left: calc(50% - 50vw);
+  min-height: 100vh;
+  background: url("../img/login-bg.png") no-repeat top center / cover;
+}
+
+.login {
+  max-width: 360px;
+  margin: var(--space-6) auto 0;
+  text-align: center;
+}
+
+/* 배경이 하늘색 사진이라 기본 어두운/회색 글자는 대비가 부족하다 — 로그인 화면 안에서만 흰 글자로 바꾼다 */
+.login .page-title,
+.login .page-note {
+  color: #fff;
+  text-shadow: 0 1px 4px rgba(0, 40, 90, 0.35);
+}
+
+.login-icon {
+  width: 96px;
+  height: auto;
+  margin: var(--space-2) 0 0;
+}
+
+.login-note {
+  margin: var(--space-4) 0 0;
+}
+
+.login-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-top: var(--space-5);
+}
+
+/* 세 버튼은 크기·글자·배치가 모두 같고 색만 서비스마다 다르다. 대표 이미지는 왼쪽, 글자는 가운데 (아이콘 폭만큼 오른쪽을 비워 균형을 맞춘다) */
+.login-btn {
+  display: grid;
+  grid-template-columns: 24px 1fr 24px;
+  align-items: center;
+  gap: var(--space-3);
+  min-height: 48px;
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid transparent;
+  border-radius: var(--radius-md);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.login-btn-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+}
+
+.login-btn-icon svg {
+  width: 20px;
+  height: 20px;
+}
+
+.login-btn--google {
+  border-color: var(--brand-google-border);
+  background: var(--surface);
+  color: var(--brand-google-text);
+}
+
+.login-btn--kakao {
+  background: var(--brand-kakao);
+  color: var(--brand-kakao-text);
+}
+
+.login-btn--naver {
+  background: var(--brand-naver);
+  color: var(--brand-naver-text);
+}
+
+.login-btn:hover {
+  filter: brightness(0.96);
+}
+
+.login-btn:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.login-btn:disabled {
+  opacity: 0.5;
+  filter: none;
+  cursor: not-allowed;
+}
+
+.login-error {
+  margin: var(--space-4) 0 0;
+  font-size: 13px;
+  color: var(--text-danger);
+}
+
+/* [CONSENT] 약관 동의 화면(consentPage.js, #/consent) - 로그인 화면(.login)과 같은 360px 가운데 정렬 컬럼이지만
+   사진 배경이 없어 기본 .page-title/.page-note 글자색을 그대로 쓴다. */
+.consent {
+  max-width: 360px;
+  margin: var(--space-6) auto 0;
+}
+
+.consent-checkbox-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: 14px;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.consent-checkbox-row input {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+/* 전체 동의 줄만 더 굵고 크게, 아래 목록과 구분선으로 떨어뜨린다 */
+.consent-all {
+  padding-bottom: var(--space-4);
+  margin-top: var(--space-5);
+  border-bottom: 1px solid var(--border);
+  font-size: 16px;
+  font-weight: 700;
+}
+
+.consent-all input {
+  width: 20px;
+  height: 20px;
+}
+
+.consent-list {
+  margin: 0;
+  padding: var(--space-2) 0 0;
+  list-style: none;
+}
+
+.consent-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 44px;
+}
+
+.consent-tag {
+  font-style: normal;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.consent-tag--required {
+  color: var(--text-accent);
+}
+
+.consent-tag--optional {
+  color: var(--text-muted);
+}
+
+.consent-view-link {
+  flex-shrink: 0;
+  padding: 6px var(--space-2);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 13px;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.consent .form-error {
+  margin-top: var(--space-3);
+}
+
+.consent .btn-block {
+  margin-top: var(--space-5);
+}
+
+/* [ACCOUNT-DELETE] 회원 탈퇴 화면(accountDeletePage.js) - 데이터 목록(.legal-content 재사용) 아래 확인
+   체크박스(.consent-checkbox-row 재사용) + 탈퇴 버튼 */
+.account-delete-check {
+  margin: var(--space-2) 0 var(--space-5);
+}
+
+/* ==========================================================================
+   10. 여행 공통 셸 · 나의 여행 화면  [SHELL] [MYTRIP] [MEMBERS]
+   ========================================================================== */
+
+/* SHELL(tripShell.js): 나의 여행·일정·가계부·여행지갑 네 화면에서 화면이 바뀌어도 body에 그대로 남아 있는
+   상단 아이콘 바(TOPBAR)·하단 탭바(BOTTOMTABS)·우측 슬라이드 메뉴(MENU)다. 위·아래 모두 뷰포트에
+   position: fixed로 떠 있어서, 그 네 화면은 --shell-top-h/--shell-bottom-h(위 토큰)만큼씩 안쪽으로
+   비켜 앉아야 가려지지 않는다: 고정 전체화면 페이지(나의 여행·가계부·여행지갑)는 inset 대신 그 값을
+   top/bottom으로 쓰고, 보통 스크롤되는 일정 화면은 .app-top 쪽에서 따로 비켜 앉는다([SCHEDULE] 참고). */
+
+/* [MYTRIP-TOPBAR] 상단 아이콘 바 */
+
+.mytrip-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  max-width: var(--content-max);
+  margin-inline: auto;
+  z-index: var(--z-shell);
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  height: var(--shell-top-h);
+  padding: 0 var(--space-3);
+  padding-top: env(safe-area-inset-top); /* --shell-top-h가 이 값만큼 이미 늘어나 있어서, 아이콘 줄 자체는 그대로 60px 높이를 쓴다 */
+  background: var(--page-bg-blue); /* 예전엔 --mint(민트) 배경에 흰 아이콘이었다 - 배경이 밝아져서
+     아이콘 4개 모두 tripShell.js에서 .mytrip-icon-btn--dark를 함께 쓴다 */
+  color: var(--text);
+}
+
+.mytrip-bar-spacer {
+  flex: 1;
+}
+
+/* 홈 아이콘과 메뉴(☰) 버튼 사이, 메뉴 버튼 바로 앞에 두는 계정 아이콘·이름 - main(MAIN-ACCOUNT)과 같은
+   구조(profileAvatarHtml)를 tripShell.js#topbarAccountHtml이 가져다 쓴다. 아이콘 크기는 main의
+   .main-avatar(28px)와 맞춘다. */
+.mytrip-bar-account {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-2);
+  margin-right: var(--space-2);
+  font-size: 13px;
+  color: var(--text);
+}
+
+.mytrip-bar-avatar {
+  position: relative;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  overflow: hidden;
+  border-radius: 50%;
+  background: var(--surface-muted);
+}
+
+.mytrip-bar-avatar-initial,
+.mytrip-bar-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.mytrip-bar-avatar-initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.mytrip-bar-avatar img {
+  object-fit: cover;
+}
+
+.mytrip-bar-account-name {
+  max-width: 96px;
+  overflow: hidden;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.mytrip-icon-btn {
+  width: var(--tap-min);
+  height: var(--tap-min);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.mytrip-icon-btn:hover,
+.mytrip-icon-btn:focus-visible {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.mytrip-icon-btn--dark {
+  color: var(--text);
+}
+
+.mytrip-icon-btn--dark:hover,
+.mytrip-icon-btn--dark:focus-visible {
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* [MYTRIP] 나의 여행 화면(#/my-trip/:id) 자체는 SHELL 사이에 낀 화면이다. 고정 전체화면 페이지라
+   inset 대신 위아래를 --shell-top-h/--shell-bottom-h만큼 비워서 TOPBAR·BOTTOMTABS에 가리지 않게 한다. */
+
+.page[data-page="my-trip"] {
+  position: fixed;
+  top: var(--shell-top-h);
+  bottom: var(--shell-bottom-h);
+  left: 0;
+  right: 0;
+  max-width: none;
+  padding: 0;
+  overflow: hidden; /* 스크롤은 안의 .mytrip-status-scroll만 한다(budget/wallet/lodging과 같은 방식) */
+}
+
+/* [MYTRIP-STATUS] "여행중" 탭 본문 - myTripPage.js#computeTripPhase가 가른 3가지 상태(여행 전/출발 전/
+   여행중)에 따라 다른 카드 묶음을 세로로 한 줄씩 쌓는다(그리드 아님). 헤더·스크롤 영역의 좌우 여백은
+   budget-header/-scroll · wallet-shell 등 다른 SHELL 화면과 같은 var(--space-5) 기준을 맞췄다. */
+
+.mytrip-status-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--content-max);
+  height: 100%;
+  margin-inline: auto;
+  background: var(--page-bg-blue);
+}
+
+.mytrip-status-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5); /* .page[data-page="my-trip"]가 이미 SHELL 상단바 아래로 비켜 앉아 있어 별도 안전영역 여백은 필요 없다 */
+  background: var(--surface-blue);
+  border-bottom: 1px solid var(--border);
+}
+
+.mytrip-status-header-text {
+  min-width: 0;
+}
+
+.mytrip-status-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+  color: var(--text-soft);
+}
+
+.mytrip-status-sub {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 자동갱신(추후 API 연동 시 타이머로 추가)과 별개로 동작하는 수동 새로고침 */
+.mytrip-refresh-btn {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap-min);
+  padding-inline: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-pill);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 700;
+  box-shadow: var(--shadow-sm);
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.mytrip-refresh-btn:hover,
+.mytrip-refresh-btn:focus-visible {
+  border-color: var(--accent);
+  color: var(--text-accent);
+}
+
+.mytrip-refresh-btn.is-refreshing svg {
+  animation: mytrip-refresh-spin 0.5s linear;
+}
+
+@keyframes mytrip-refresh-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.mytrip-status-scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.mytrip-status-loading {
+  padding: 64px 20px;
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.mytrip-card {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+}
+
+.mytrip-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.mytrip-card-title-group {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+}
+
+.mytrip-card-icon {
+  flex-shrink: 0;
+  font-size: 18px;
+  line-height: 1;
+}
+
+.mytrip-card-title {
+  margin: 0;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* "오후 3시 기준" - 카드마다 정보 기준 시각을 작게 표기 */
+.mytrip-card-time {
+  flex-shrink: 0;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.mytrip-card-body {
+  color: var(--text);
+}
+
+.mytrip-card-stat {
+  margin: 0;
+  font-size: 17px;
+  font-weight: 800;
+  color: var(--text-soft);
+}
+
+.mytrip-card-stat-sub {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.mytrip-card-empty {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* 위치 권한처럼 실제 OS 권한 팝업 전에 보여주는 안내 카드의 버튼 줄 (myTripPage.js#permissionBodyHtml) -
+   .btn-cancel/.btn-save를 그대로 재사용하고, 이 줄 안에서만 폭을 절반씩 나눠 쓰게 한다. */
+.mytrip-card-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+}
+
+.mytrip-card-actions .btn {
+  flex: 1;
+}
+
+/* 날씨 카드의 "장기 예보 참고용" 같은, 목록 밑에 붙는 작은 단서 문구 */
+.mytrip-card-note {
+  margin: var(--space-2) 0 0;
+  color: var(--text-faint);
+  font-size: 12px;
+}
+
+.mytrip-card-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 13px;
+  color: var(--text);
+}
+
+.mytrip-card-list--spots {
+  gap: var(--space-3);
+}
+
+.mytrip-card-list--spots li {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+.mytrip-spot-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--surface-muted);
+  font-size: 16px;
+}
+
+.mytrip-spot-text {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.mytrip-spot-text strong {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.mytrip-spot-text small {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* 현지 뉴스·할인 정보 카드(travel-briefing Edge Function 결과) - 항목마다 출처 링크가 붙는다 */
+.mytrip-card-list--briefing {
+  gap: var(--space-3);
+}
+
+.mytrip-briefing-item {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.mytrip-briefing-title {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text);
+}
+
+.mytrip-briefing-summary {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.mytrip-briefing-source {
+  align-self: flex-start;
+  margin-top: 2px;
+  color: var(--text-accent);
+  font-size: 12px;
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.mytrip-briefing-source:hover,
+.mytrip-briefing-source:focus-visible {
+  text-decoration: underline;
+}
+
+/* [MEMBERS] 참여 인원 아바타 · 멤버 관리 창 (tripMembers.js). MYTRIP 화면 개편으로 지금은 이 아바타 줄을
+   붙일 자리가 없어 mount()가 호출되지 않지만, 멤버 관리 창(MEMBERS-MANAGE)이 여전히 이 클래스들을
+   재사용하므로(avatarHtml → rowHtml) 그대로 남겨 둔다. */
+
+.member-stack {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-height: 36px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+}
+
+button.member-stack {
+  cursor: pointer;
+}
+
+.member-avatars {
+  display: inline-flex;
+}
+
+.member-avatar {
+  position: relative;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  margin-left: -8px;
+  overflow: hidden;
+  border: 2px solid var(--mint);
+  border-radius: 50%;
+  background: var(--mint-dark);
+}
+
+.member-avatar:first-child {
+  margin-left: 0;
+}
+
+.member-avatar-initial,
+.member-avatar img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.member-avatar-initial {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: var(--surface);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.member-avatar img {
+  object-fit: cover;
+}
+
+.member-more {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.member-manage {
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+/* [MEMBERS-MANAGE] 멤버 관리 창 */
+
+.member-modal {
+  max-width: 400px;
+}
+
+.member-note {
+  margin: 0 0 var(--space-3);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.member-list {
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  list-style: none;
+}
+
+.member-row {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.member-row .member-avatar {
+  margin-left: 0;
+  border-color: var(--border);
+  background: var(--surface-muted);
+}
+
+.member-row .member-avatar-initial {
+  color: var(--text-soft);
+}
+
+.member-info {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.member-name {
+  overflow: hidden;
+  font-size: 15px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.member-me {
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  color: var(--text-soft);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.member-role {
+  color: var(--text-muted);
+  font-size: 12px;
+}
+
+.member-kick {
+  flex-shrink: 0;
+  min-height: 36px;
+  padding-inline: var(--space-3);
+  font-size: 13px;
+}
+
+/* [MYTRIP-BOTTOMTABS] 하단 탭바 */
+
+.mytrip-tabs {
+  position: fixed;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  max-width: var(--content-max);
+  margin-inline: auto;
+  z-index: var(--z-shell);
+  display: flex;
+  border-top: 1px solid var(--border);
+  background: var(--page-bg-blue);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+.mytrip-tab {
+  flex: 1;
+  min-height: 56px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.mytrip-tab[aria-current="page"] {
+  color: var(--text);
+}
+
+.mytrip-tab:hover,
+.mytrip-tab:focus-visible {
+  color: var(--text);
+}
+
+/* [MYTRIP-MENU] 우측 슬라이드 메뉴: 닫혀 있을 때는 보이지 않고 클릭도 통과시킨다 */
+
+.mytrip-drawer {
+  position: fixed;
+  inset: 0;
+  max-width: var(--content-max);
+  margin-inline: auto;
+  z-index: var(--z-drawer); /* 알럿(300)과 모달(100) 아래 */
+  visibility: hidden;
+  pointer-events: none;
+  transition: visibility 0s linear 0.25s;
+}
+
+.mytrip-drawer.is-open {
+  visibility: visible;
+  pointer-events: auto;
+  transition-delay: 0s;
+}
+
+.mytrip-backdrop {
+  position: absolute;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.45);
+  opacity: 0;
+  transition: opacity 0.25s ease;
+}
+
+.mytrip-drawer.is-open .mytrip-backdrop {
+  opacity: 1;
+}
+
+.mytrip-panel {
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: min(280px, 80%);
+  display: flex;
+  flex-direction: column;
+  background: var(--page-bg-blue);
+  box-shadow: var(--shadow-md);
+  transform: translateX(100%);
+  transition: transform 0.25s ease;
+}
+
+.mytrip-drawer.is-open .mytrip-panel {
+  transform: translateX(0);
+}
+
+/* 패널 헤드 글자("메뉴")는 뺐다 - 닫기(✕)는 왼쪽 끝, 알림(🔔)·설정(⚙, commonPages.js 공용 화면)은
+   오른쪽 끝에 두 아이콘만 바짝 붙여 묶는다(.mytrip-panel-head-actions) - mainPage.js(MAIN-MENU)·
+   tripShell.js(MYTRIP-MENU)가 같은 구조를 쓴다. */
+.mytrip-panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-2) var(--space-5) var(--space-2) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  font-size: 16px;
+}
+
+.mytrip-panel-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+
+.mytrip-menu {
+  margin: 0;
+  padding: var(--space-2) 0;
+  list-style: none;
+}
+
+.mytrip-menu button {
+  width: 100%;
+  min-height: 52px;
+  padding-inline: var(--space-5);
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 15px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.mytrip-menu button:hover,
+.mytrip-menu button:focus-visible {
+  background: var(--page-bg);
+}
+
+/* 로그아웃은 다른 메뉴와 구분선으로 떨어뜨리고 경고색으로 보여준다 */
+.mytrip-menu-logout {
+  margin-top: var(--space-2);
+  padding-top: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.mytrip-menu-logout button {
+  color: var(--text-danger);
+  font-weight: 600;
+}
+
+/* 여행 삭제가 로그아웃 바로 위에 있을 때는 구분선을 삭제 위에만 둔다 */
+.mytrip-menu-delete + .mytrip-menu-logout {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: none;
+}
+
+/* [MYTRIP-EXIT-CONFIRM] 여행 삭제/나가기 확인창 */
+.trip-exit-note {
+  margin: 0 0 var(--space-4);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+/* ==========================================================================
+   11. 알럿 · 토스트  [UI]
+   ========================================================================== */
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: var(--space-6);
+  transform: translateX(-50%);
+  z-index: var(--z-toast);
+  padding: 10px 18px;
+  border-radius: var(--radius-pill);
+  background: rgba(28, 28, 30, 0.92);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* SHELL(tripShell.js)이 떠 있는 화면(나의 여행·일정·가계부·여행지갑)에서는 토스트도 하단 탭바 위로 띄운다 */
+body.has-trip-shell .toast {
+  bottom: calc(var(--space-6) + var(--shell-bottom-h));
+}
+
+.alert-overlay {
+  z-index: var(--z-alert); /* 슬라이드 메뉴 등 다른 화면 요소 위 */
+}
+
+.alert-message {
+  margin: 0 0 var(--space-4);
+  font-size: 15px;
+  line-height: 1.5;
+}
+
+/* ==========================================================================
+   12. 반응형 · 접근성  [RESPONSIVE]
+   ========================================================================== */
+
+/* 터치 기기(휴대폰·태블릿): iOS Safari는 글자가 16px보다 작은 입력칸을 누르면 화면을 확대해 버린다.
+   입력칸마다 정해 둔 글자 크기(클래스 규칙)를 이기려고 !important를 쓴다. 시간 입력칸(.flight-time-big)은 원래 더 커서 뺀다. */
+@media (pointer: coarse) {
+  input:not([type="checkbox"]):not([type="radio"]):not([type="file"]):not(.flight-time-big),
+  select,
+  textarea {
+    font-size: 16px !important;
+  }
+}
+
+/* 작은 화면(360px 안팎): 좌우 여백과 큰 글자를 줄인다 */
+@media (max-width: 400px) {
+  .app-header,
+  .quick-menu {
+    padding-inline: var(--space-4);
+  }
+
+  .timeline {
+    padding: var(--space-4);
+    padding-bottom: calc(var(--space-4) + var(--timeline-tail, 0px) + 57px);
+  }
+
+  .page {
+    padding-inline: var(--space-4);
+  }
+
+  .modal-overlay {
+    padding: var(--space-3);
+  }
+
+  .modal {
+    padding: var(--space-4);
+  }
+
+  .trip-card {
+    padding: var(--space-3) var(--space-4);
+  }
+
+  .trip-card-dest {
+    font-size: 16px;
+  }
+
+}
+
+/* 데스크톱: 나의 여행 화면의 앱 영역 경계를 보여준다 */
+@media (min-width: 1024px) {
+  .page[data-page="my-trip"] {
+    box-shadow: 0 0 0 1px var(--border);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flight-ticket-status--busy {
+    animation: none;
+  }
+
+  .mytrip-refresh-btn.is-refreshing svg {
+    animation: none;
+  }
+
+  .day-map-body,
+  .day-map-chevron,
+  .day-pin-dot {
+    transition: none;
+  }
+
+  .day-pin.is-active .day-pin-dot::after {
+    animation: none;
+  }
+
+  .mytrip-drawer,
+  .mytrip-backdrop,
+  .mytrip-panel {
+    transition: none;
+  }
+}
+
+/* ==========================================================================
+   13. 별칭 보기 (개발용)  [ALIAS-VIEW]
+   주소에 ?alias=1 또는 Alt+Shift+A로 켠다 (js/aliasView.js). 화면 배치에는 영향을 주지 않는 겹침 층이다.
+   ========================================================================== */
+
+#alias-layer {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-dev);
+  pointer-events: none;
+}
+
+.alias-box {
+  position: fixed;
+  border: 1px dashed var(--alias-color);
+  pointer-events: none;
+}
+
+.alias-tag {
+  position: absolute;
+  left: 0;
+  max-width: 100%;
+  padding: 1px 6px;
+  overflow: hidden;
+  border: none;
+  border-radius: 0 0 var(--radius-sm) 0;
+  background: var(--alias-color);
+  color: var(--surface);
+  font-size: 10px;
+  font-weight: 700;
+  line-height: 14px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  pointer-events: auto;
+  cursor: copy;
+}
+
+/* ==========================================================================
+   14. 가계부 (#/budget/:id)  [BUDGET]
+   일정 화면과 같은 "여행준비 + Day1~DayN" 구조를 재사용한 새 화면 (모달 아님). 화면 전체는 고정이고
+   .budget-scroll만 스크롤된다. 하단 합계 바는 스크롤 밖에 있어 항상 보인다 (나의 여행 화면의 하단 탭바와 같은 방식).
+   ========================================================================== */
+
+.page[data-page="budget"] {
+  position: fixed;
+  top: var(--shell-top-h); /* SHELL의 고정 상단바·하단탭바 사이로 비켜 앉는다 */
+  bottom: var(--shell-bottom-h);
+  left: 0;
+  right: 0;
+  max-width: none;
+  padding: 0;
+  overflow: hidden;
+}
+
+.budget-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--content-max);
+  height: 100%;
+  margin-inline: auto;
+  background: var(--page-bg);
+}
+
+.budget-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5); /* .page[data-page="budget"]가 이미 SHELL 상단바 아래(안전영역 포함)로 비켜 앉아 있어 별도 안전영역 여백은 필요 없다 */
+  background: var(--surface-blue);
+  border-bottom: 1px solid var(--border);
+}
+
+.budget-header-text {
+  min-width: 0;
+}
+
+.budget-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.budget-subtitle {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.budget-scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-5);
+  padding: var(--space-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.budget-loading {
+  padding: 64px 20px;
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.budget-day-section {
+  display: flex;
+  flex-direction: column;
+}
+
+.budget-day-header {
+  display: flex;
+  align-items: baseline;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-2);
+}
+
+.budget-day-title {
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+}
+
+.budget-day-sub {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.budget-empty {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-4);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.budget-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+/* [BUDGET-SWIPE] 카드를 감싸서 스와이프 삭제를 담는다 - 일정 화면의 .timeline-item-wrap/.item-delete-bg,
+   메인 화면 여행 카드의 .trip-card-wrap/.trip-card-delete-bg와 같은 원리: overflow: hidden으로 클리핑하고,
+   카드가 왼쪽으로 밀린 만큼만 뒤에 숨은 삭제 배경이 드러난다. */
+.budget-item-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+}
+
+/* 사방 3px만큼 안쪽에 두는 이유는 .item-delete-bg/.trip-card-delete-bg와 같다(카드의 둥근 모서리와 겹쳐서
+   생기는 안티앨리어싱 빨간 선을 피하기 위함 - CLAUDE.md의 [TIMELINE-DRAG] 설명 참고) */
+.budget-item-delete-bg {
+  position: absolute;
+  inset: 3px;
+  border-radius: calc(var(--radius-md) - 3px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: var(--space-5);
+  background: var(--danger);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  z-index: 0;
+}
+
+.budget-item {
+  position: relative; /* .budget-item-delete-bg(absolute) 위에 뜨려면 스스로도 위치 지정 요소여야 한다 */
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3) var(--space-4);
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  touch-action: pan-y; /* 세로 스크롤은 브라우저에게 맡기고, 가로 스와이프만 JS가 가져간다 */
+}
+
+.budget-item-icon {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--surface-muted);
+  font-size: 16px;
+}
+
+.budget-item-title {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.budget-item-amount {
+  flex-shrink: 0;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.budget-add-btn {
+  min-height: var(--tap-min);
+  padding-inline: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.budget-add-btn:hover,
+.budget-add-btn:focus-visible {
+  border-color: var(--accent);
+  color: var(--text-accent);
+}
+
+.budget-total-bar {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: var(--space-4) var(--space-5); /* .page[data-page="budget"]가 이미 SHELL 하단탭바 위(안전영역 포함)로 비켜 앉아 있어 별도 안전영역 여백은 필요 없다 */
+  background: var(--surface-blue);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.budget-total-label {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.budget-total-amount {
+  color: var(--text-accent);
+  font-size: 18px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+/* [EXPENSE-FORM] 비용 추가 창 (budget-add-btn을 누르면 열린다) */
+
+/* 필드 사이 간격을 기본 폼(.form-field margin-bottom: var(--space-4))보다 좁혀서, 라벨을 뺀 지금 구성이
+   스크롤 없이 한 화면(.modal의 overflow-y: auto가 실제로 작동하지 않는 높이)에 들어오게 한다. */
+.expense-modal {
+  max-width: 420px;
+  padding: 14px var(--space-5);
+  background: var(--surface-blue); /* 팝업 자체의 배경(블렌딩된 .modal-overlay 뒷배경과는 별개) */
+}
+
+.expense-modal .modal-title {
+  margin-bottom: 10px;
+}
+
+.expense-modal .form-field {
+  margin-bottom: 10px;
+}
+
+.expense-modal textarea {
+  min-height: 56px;
+}
+
+.expense-currency-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.expense-currency-picker {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.expense-currency-trigger {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-height: var(--tap-min);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+  white-space: nowrap;
+  cursor: pointer;
+}
+
+.expense-currency-trigger:hover,
+.expense-currency-trigger:focus-visible {
+  border-color: var(--accent);
+}
+
+.expense-currency-caret {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+/* 통화 목록: 트리거 버튼 바로 아래에 뜨고, 아래의 날짜 필드(.expense-day-list가 z-index:1)보다 위에
+   그려지도록 그보다 높은 z-index를 준다. */
+.expense-currency-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 2;
+  width: max-content;
+  min-width: 200px;
+  max-width: 260px;
+  margin: 0;
+  padding: var(--space-2) 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  list-style: none;
+}
+
+.expense-currency-option {
+  padding: 8px var(--space-3);
+  color: var(--text);
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.expense-currency-option:hover,
+.expense-currency-option--active {
+  background: var(--surface-muted);
+}
+
+.expense-amount-input {
+  flex: 1;
+  min-width: 0;
+}
+
+/* 날짜 선택: 통화 선택과 같은 토글형 드롭다운 (한 번에 Day를 전부 늘어놓지 않는다) */
+.expense-day-picker {
+  position: relative;
+}
+
+.expense-day-trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: var(--tap-min);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.expense-day-trigger:hover,
+.expense-day-trigger:focus-visible {
+  border-color: var(--accent);
+}
+
+.expense-day-caret {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.expense-day-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 1;
+  width: 100%;
+  max-height: 240px;
+  margin: 0;
+  padding: var(--space-2) 0;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  list-style: none;
+}
+
+.expense-day-option {
+  padding: 8px var(--space-3);
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.expense-day-option:hover,
+.expense-day-option--active {
+  background: var(--surface-muted);
+}
+
+.expense-payment-row {
+  display: flex;
+  gap: var(--space-5);
+}
+
+.expense-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.expense-radio input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--accent);
+}
+
+.expense-category-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+  padding-bottom: 2px; /* 스크롤바가 없어도 칩 테두리가 안 잘리게 */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.expense-category-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.expense-category-item {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  width: 56px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.expense-category-icon {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 4px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--surface-muted);
+  font-size: 20px;
+}
+
+.expense-category-item--active .expense-category-icon {
+  background: var(--accent);
+}
+
+.expense-category-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.expense-category-item--active .expense-category-label {
+  color: var(--text-accent);
+  font-weight: 700;
+}
+
+/* 결제자/더치페이: 각각 모든 멤버를 아바타+이름 칩으로 옆으로 스크롤해서 보여준다(다중 선택) */
+.expense-member-role {
+  margin-bottom: 8px;
+}
+
+.expense-member-role:last-child {
+  margin-bottom: 0;
+}
+
+.expense-member-role-label {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+  color: var(--text-soft);
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.expense-member-info-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+.expense-member-info {
+  display: inline-flex;
+  width: 14px;
+  height: 14px;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 12px;
+  cursor: pointer;
+}
+
+/* ⓘ를 누르면 그 위로 뜨는 말풍선(간단한 안내 한 줄) - ::after가 아래를 가리키는 꼬리를 그린다 */
+.expense-member-tooltip {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 50%;
+  z-index: 1;
+  width: max-content;
+  max-width: 200px;
+  padding: 6px 10px;
+  transform: translateX(-50%);
+  border-radius: var(--radius-sm);
+  background: var(--text-soft);
+  color: #ffffff;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: var(--shadow-md);
+}
+
+.expense-member-tooltip::after {
+  content: "";
+  position: absolute;
+  top: 100%;
+  left: 50%;
+  width: 0;
+  height: 0;
+  border: 5px solid transparent;
+  border-top-color: var(--text-soft);
+  transform: translateX(-50%);
+}
+
+/* 아바타 칩 사이 간격을 좁혀서 한 번에 더 많이 보이게 한다. 위쪽 패딩은 삭제 배지(위로 살짝 튀어나옴)가
+   overflow-x: auto인 이 컨테이너에 의해 잘리지 않게 하기 위해서다 (overflow-x가 auto면 overflow-y도
+   자동으로 auto가 되어, 패딩 밖으로 나간 요소는 스크롤 전에는 가려진다). */
+.expense-member-row-scroll {
+  display: flex;
+  gap: 2px;
+  padding: 6px 2px 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.expense-member-row-scroll::-webkit-scrollbar {
+  display: none;
+}
+
+.expense-member-status {
+  margin: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.expense-member-chip {
+  position: relative;
+  flex-shrink: 0;
+}
+
+.expense-member-chip-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  width: 48px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* 결제자/더치페이 칩의 아바타는 멤버 프로필 아이콘(기본 32px)보다 조금 크게(40px) - "+" 추가 아이콘과 같은 크기 */
+.expense-member-chip-btn .member-avatar {
+  width: 40px;
+  height: 40px;
+  margin-left: 0;
+  border: 2px solid transparent;
+  background: var(--surface-muted);
+}
+
+.expense-member-chip-btn .member-avatar-initial {
+  color: var(--text-soft);
+}
+
+.expense-member-chip-btn--active .member-avatar {
+  border-color: var(--accent);
+}
+
+.expense-member-chip-name {
+  overflow: hidden;
+  max-width: 100%;
+  margin-top: 4px;
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.expense-member-chip-btn--active .expense-member-chip-name {
+  color: var(--text-accent);
+  font-weight: 700;
+}
+
+/* "+ 추가"로 넣은 참여자에게만 붙는 삭제 배지 (실제 여행 멤버는 지울 수 없다) */
+.expense-member-chip-remove {
+  position: absolute;
+  top: -2px;
+  right: 4px;
+  display: flex;
+  width: 16px;
+  height: 16px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: var(--text-danger);
+  color: #ffffff;
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+
+.expense-member-add {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  width: 48px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+/* 멤버 아바타(.expense-member-chip-btn .member-avatar)와 정확히 같은 40px 원형 버튼 */
+.expense-member-add-avatar {
+  display: flex;
+  width: 40px;
+  height: 40px;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* [EXPENSE-FORM] "+ 추가" 인원 추가 작은 팝업 */
+.expense-add-member-save {
+  background: var(--dday-pastel-bg);
+  color: var(--dday-pastel-ink);
+}
+
+/* ==========================================================================
+   15. 여행지갑 (#/wallet)  [WALLET] [WALLET-FORM] [WALLET-VIEWER]
+   일정 화면의 QUICK-MENU에서 들어오는 개인 전체 문서함. 특정 여행에 매이지 않는다(:id 없음).
+   화면 전체는 고정이고 .wallet-scroll만 스크롤된다. 그 안에 개인지갑/공유지갑 두 섹션이 위아래로 늘
+   함께 보인다(탭 전환 없음). "+" 버튼은 화면에 고정된다.
+   ========================================================================== */
+
+.page[data-page="wallet"] {
+  position: fixed;
+  top: var(--shell-top-h); /* SHELL의 고정 상단바·하단탭바 사이로 비켜 앉는다 */
+  bottom: var(--shell-bottom-h);
+  left: 0;
+  right: 0;
+  max-width: none;
+  padding: 0;
+  overflow: hidden;
+}
+
+.wallet-shell {
+  position: relative; /* "+" 버튼의 fixed 위치는 뷰포트 기준이라 이 relative는 시각적 의미는 없지만, 넓은 화면에서 가운데 정렬된 폭과 맞춰 두기 위한 기준점이다 */
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--content-max);
+  height: 100%;
+  margin-inline: auto;
+  background: var(--page-bg);
+}
+
+.wallet-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5); /* .page[data-page="wallet"]가 이미 SHELL 상단바 아래(안전영역 포함)로 비켜 앉아 있어 별도 안전영역 여백은 필요 없다 */
+  background: var(--surface-blue);
+  border-bottom: 1px solid var(--border);
+}
+
+.wallet-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.wallet-scroll {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: var(--space-5);
+  overscroll-behavior: contain;
+}
+
+.wallet-empty {
+  padding: 64px 20px;
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* 개인지갑/공유지갑 섹션: 좌우 탭 대신 위(개인지갑)·아래(공유지갑) 순서로 늘 함께 보인다.
+   제목 위아래에 구분선을 둬서 "----- 개인 지갑 -----" 같은 구획으로 읽히게 한다. */
+.wallet-section + .wallet-section {
+  margin-top: var(--space-6);
+}
+
+.wallet-section-title {
+  margin: 0 0 var(--space-4);
+  padding: var(--space-3) 0;
+  border-top: 1px solid var(--border);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 15px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.wallet-section .wallet-empty {
+  padding: 32px 20px; /* 섹션 안이라 화면 전체를 기준으로 한 .wallet-empty의 기본 여백(64px)은 너무 크다 */
+}
+
+.wallet-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-4);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.wallet-card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: var(--surface);
+  border-radius: var(--radius-md);
+  box-shadow: var(--shadow-sm);
+  cursor: pointer;
+}
+
+.wallet-card-cat {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 1;
+  display: flex;
+  width: 26px;
+  height: 26px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.45);
+  font-size: 13px;
+}
+
+.wallet-card-image,
+.wallet-card-pdf {
+  display: flex;
+  aspect-ratio: 1 / 1;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-muted);
+}
+
+.wallet-card-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.wallet-card-pdf {
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-3);
+}
+
+.wallet-card-pdf-icon {
+  font-size: 36px;
+}
+
+.wallet-card-pdf-name {
+  width: 100%;
+  overflow: hidden;
+  color: var(--text-muted);
+  font-size: 11px;
+  text-align: center;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wallet-card-status {
+  padding: var(--space-3);
+  color: var(--text-muted);
+  font-size: 12px;
+  text-align: center;
+}
+
+.wallet-card-status--error {
+  color: var(--text-faint);
+}
+
+.wallet-card-title {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  overflow: hidden;
+  font-size: 13px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wallet-fab {
+  position: fixed;
+  right: max(var(--space-5), calc((100% - var(--content-max)) / 2 + var(--space-5)));
+  bottom: calc(var(--space-5) + var(--shell-bottom-h)); /* 뷰포트 기준 고정 버튼이라 SHELL의 고정 하단탭바(안전영역 포함) 위로 띄운다 */
+  width: 56px;
+  height: 56px;
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #ffffff;
+  font-size: 28px;
+  line-height: 1;
+  cursor: pointer;
+  box-shadow: var(--shadow-md);
+}
+
+.wallet-fab:hover,
+.wallet-fab:focus-visible {
+  filter: brightness(1.08);
+}
+
+/* [WALLET-FORM] 문서 업로드 창 (wallet-fab을 누르면 열린다) */
+
+.wallet-form-modal {
+  max-width: 420px;
+  background: var(--surface-blue); /* 팝업 자체의 배경(블렌딩된 .modal-overlay 뒷배경과는 별개) */
+}
+
+/* 저장 위치(개인지갑/공유지갑): 라벨 없이 동그란 라디오 버튼 두 개를 나란히 둔다(기본 선택은 개인지갑) -
+   expenseForm.js의 결제수단(현금/카드) 라디오(.expense-radio)와 같은 모양·크기로 맞춘다. */
+.wallet-form-visibility-row {
+  display: flex;
+  gap: var(--space-5);
+}
+
+/* .form-field label(전역, display:block)보다 더 구체적이어야 여기서 의도한 display:flex가 실제로 이긴다 -
+   그렇지 않으면 라디오와 글자가 각자의 기본 baseline 정렬로 떨어져 글자가 더 아래로 처져 보인다. */
+.wallet-form-visibility-row .wallet-form-visibility-radio {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.wallet-form-visibility-radio input {
+  width: 18px;
+  height: 18px;
+  /* 이전엔 --dday-pastel-bg(연한 파스텔 블루)를 썼는데, 선택된 라디오가 흐릿하고 커 보였다 -
+     .expense-radio와 같은 --accent(진한 파랑)로 바꿔 선택 표시를 또렷하고 작게 보이게 한다. */
+  accent-color: var(--accent);
+}
+
+/* 이 팝업의 "저장" 버튼만 파스텔 블루로 - 다른 화면의 .btn-save(진한 --accent)는 그대로 둔다 */
+.wallet-form-modal .btn-save {
+  background: var(--dday-pastel-bg);
+}
+
+.wallet-picker-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.wallet-picker-btn {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  min-height: 64px;
+  padding: var(--space-2);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 600;
+  text-align: center;
+  cursor: pointer;
+}
+
+.wallet-picker-btn span {
+  font-size: 20px;
+}
+
+.wallet-picker-btn:hover,
+.wallet-picker-btn:focus-visible {
+  border-color: var(--accent);
+  color: var(--text-accent);
+}
+
+.wallet-form-preview {
+  position: relative;
+  display: flex;
+  min-height: 160px;
+  margin-top: var(--space-2);
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+}
+
+.wallet-form-preview img {
+  width: 100%;
+  max-height: 240px;
+  object-fit: contain;
+}
+
+.wallet-preview-pdf {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: var(--space-4);
+  color: var(--text-soft);
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.wallet-preview-pdf span {
+  font-size: 28px;
+}
+
+.wallet-preview-clear {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: flex;
+  width: 28px;
+  height: 28px;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.55);
+  color: #ffffff;
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.wallet-form-category-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-3);
+  padding-bottom: 2px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.wallet-form-category-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.wallet-form-category-item {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  width: 56px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.wallet-form-category-icon {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 4px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--surface-muted);
+  font-size: 20px;
+}
+
+.wallet-form-category-item--active .wallet-form-category-icon {
+  background: var(--accent);
+}
+
+.wallet-form-category-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.wallet-form-category-item--active .wallet-form-category-label {
+  color: var(--text-accent);
+  font-weight: 700;
+}
+
+/* [WALLET-VIEWER] 문서 상세 보기 (카드를 누르면 열린다). 표준 .modal(420px)이 아니라 화면 전체를 쓴다 —
+   기본 .modal-overlay의 padding·가운데 정렬을 걷어낸다. */
+
+.wallet-viewer-overlay {
+  padding: 0;
+  align-items: stretch;
+}
+
+.wallet-viewer {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--content-max);
+  height: 100%;
+  margin-inline: auto;
+  background: var(--page-bg);
+}
+
+.wallet-viewer-header {
+  display: flex;
+  flex-shrink: 0;
+  align-items: flex-start;
+  gap: var(--space-3);
+  padding: var(--space-4) var(--space-5);
+  padding-top: calc(var(--space-4) + env(safe-area-inset-top)); /* 이 뷰어는 전체화면(.wallet-viewer-overlay가 padding:0)이라 노치를 직접 피해야 한다 */
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+}
+
+.wallet-viewer-close {
+  flex-shrink: 0;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border: none;
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text);
+  font-size: 18px;
+  cursor: pointer;
+}
+
+.wallet-viewer-close:hover,
+.wallet-viewer-close:focus-visible {
+  background: var(--surface-muted);
+}
+
+.wallet-viewer-header-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.wallet-viewer-title {
+  margin: 0;
+  overflow: hidden;
+  font-size: 17px;
+  font-weight: 800;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.wallet-viewer-meta {
+  margin: 2px 0 0;
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.wallet-viewer-delete {
+  flex-shrink: 0;
+  min-height: var(--tap-min);
+}
+
+.wallet-viewer-desc {
+  margin: 0;
+  padding: var(--space-3) var(--space-5);
+  background: var(--surface);
+  border-bottom: 1px solid var(--border);
+  color: var(--text-soft);
+  font-size: 13px;
+  white-space: pre-wrap;
+}
+
+.wallet-viewer-body {
+  display: flex;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.wallet-viewer-status {
+  margin: auto;
+  padding: var(--space-4);
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+/* 이미지 영역만 어두운 배경을 써서(사진 감상용 관례) 사진이 도드라져 보이게 한다. 헤더·설명·PDF 영역은
+   앱의 기본 밝은 배색을 그대로 쓴다. */
+.wallet-viewer-image-wrap {
+  position: relative;
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  background: var(--text);
+  touch-action: none;
+}
+
+.wallet-viewer-image-wrap .wallet-viewer-status {
+  color: var(--surface);
+}
+
+.wallet-viewer-image {
+  max-width: 100%;
+  max-height: 100%;
+  touch-action: none;
+  cursor: grab;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+.wallet-viewer-image-wrap--zoomed .wallet-viewer-image {
+  cursor: grabbing;
+}
+
+.wallet-viewer-pdf {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+}
+
+.wallet-viewer-pdf-frame {
+  flex: 1;
+  border: none;
+  background: var(--surface-muted);
+}
+
+.wallet-viewer-pdf-link {
+  display: block;
+  padding: var(--space-3);
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  color: var(--text-accent);
+  font-size: 14px;
+  font-weight: 700;
+  text-align: center;
+  text-decoration: none;
+}
+
+/* ==========================================================================
+   16. 여행 가져오기 창  [TRIP-IMPORT-MODAL]
+   MAIN(새 여행 만들기 옆)과 SCHEDULE(가져오기 버튼) 양쪽에서 여는 같은 모달. .wizard* 공통 클래스를 그대로
+   쓰고(헤더·본문·하단 버튼), 탭 3개(파일/텍스트/사진)만 이 섹션에서 새로 정의한다.
+   ========================================================================== */
+
+.trip-import-lead {
+  margin: 0 0 var(--space-4);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.trip-import-tabs {
+  display: flex;
+  gap: var(--space-2);
+  margin-bottom: var(--space-5);
+}
+
+.trip-import-tab {
+  flex: 1;
+  min-height: var(--tap-min);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text-soft);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.trip-import-tab--active {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.trip-import-desc {
+  margin: 0 0 var(--space-4);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.trip-import-textarea {
+  width: 100%;
+  min-height: 160px;
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 14px;
+  font-family: inherit;
+  resize: vertical;
+}
+
+.trip-import-photo-actions {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.trip-import-photo-actions .btn {
+  flex: 1;
+}
+
+/* 파일 탭의 선택 결과: PDF·이미지 구분 없이 아이콘 + 파일명(wallet-form의 PDF 미리보기와 같은 패턴) */
+.trip-import-file-preview {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+}
+
+.trip-import-file-icon {
+  font-size: 20px;
+}
+
+.trip-import-file-name {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+/* 사진 탭의 선택 결과: 실제 사진 미리보기(flight.js의 항공권 사진 미리보기와 같은 패턴) */
+.trip-import-photo-preview {
+  position: relative;
+  margin-top: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+}
+
+.trip-import-photo-preview img {
+  display: block;
+  width: 100%;
+  max-height: 200px;
+  object-fit: contain;
+  border-radius: var(--radius-sm);
+}
+
+.trip-import-clear {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(0, 0, 0, 0.1);
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.trip-import-photo-preview .trip-import-clear {
+  position: absolute;
+  top: var(--space-2);
+  right: var(--space-2);
+  background: rgba(0, 0, 0, 0.55);
+  color: #ffffff;
+}
+
+.trip-import-status {
+  margin: var(--space-4) 0 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ==========================================================================
+   17. 여행 가져오기 미리보기 창  [TRIP-IMPORT-PREVIEW]
+   analyze-trip-import 결과를 확인·수정하는 화면. .wizard* 공통 클래스를 그대로 쓰고, 카드 목록만
+   여기서 새로 정의한다. 저장 전 단계라 값은 모두 그때그때 state에 직접 반영되는 평범한 입력칸이다
+   (별도 편집 모달 없음 - "카드로 나열, 수정 가능"이라는 요구를 가장 단순하게 만족한다).
+   ========================================================================== */
+
+.trip-import-preview-section {
+  margin-bottom: var(--space-6);
+}
+
+.trip-import-preview-section-title {
+  margin: 0 0 var(--space-3);
+  font-size: 14px;
+  font-weight: 800;
+}
+
+.trip-import-preview-tripform {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin-bottom: var(--space-6);
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+}
+
+.trip-import-preview-empty {
+  margin: 0;
+  padding: var(--space-4);
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.trip-import-preview-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.trip-import-preview-card {
+  padding: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.trip-import-preview-card-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: var(--space-2);
+}
+
+.trip-import-preview-card-head .trip-import-preview-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.trip-import-preview-badge {
+  display: inline-block;
+  margin-bottom: var(--space-2);
+  padding: 3px var(--space-2);
+  border-radius: var(--radius-pill);
+  background: var(--color-shopping);
+  color: #ffffff;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* "1일차"처럼 상대적으로만 표현된 날짜를 인식했다는 안내 - 기존 항목 교체 배지(경고성)와 구분되는 중립 톤 */
+.trip-import-preview-badge--info {
+  margin-left: var(--space-2);
+  background: var(--accent);
+}
+
+.trip-import-preview-input,
+.trip-import-preview-select {
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  font-size: 14px;
+  font-family: inherit;
+}
+
+.trip-import-preview-card textarea.trip-import-preview-input {
+  min-height: 44px;
+  resize: vertical;
+}
+
+/* 카드 안의 모든 줄(헤더/배지/카테고리/제목/시간·장소 줄/메모)은 같은 간격으로 쌓인다 */
+.trip-import-preview-card > * + * {
+  margin-top: var(--space-2);
+}
+
+.trip-import-preview-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.trip-import-preview-row .trip-import-preview-input {
+  flex: 1;
+  min-width: 0;
+}
+
+.trip-import-preview-remove {
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border: none;
+  border-radius: 50%;
+  background: var(--surface-muted);
+  color: var(--text-danger);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.trip-import-preview-remove:hover {
+  background: var(--danger);
+  color: #ffffff;
+}

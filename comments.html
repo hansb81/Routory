@@ -1,0 +1,309 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>TripLog 별칭 지도 (comments)</title>
+<style>
+  :root {
+    --bg: #f5f5f7; --card: #ffffff; --text: #1c1c1e; --soft: #48484a; --muted: #6b6b70;
+    --line: #e2e2e5; --accent: #007aff; --chip: #eef4ff; --code: #f0f0f2; --ok: #1a7f37;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --bg: #111113; --card: #1c1c1e; --text: #f2f2f7; --soft: #c7c7cc; --muted: #8e8e93;
+      --line: #2c2c2e; --accent: #4da3ff; --chip: #16263d; --code: #2a2a2d; --ok: #57c274; }
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text); font: 15px/1.6 "Malgun Gothic", system-ui, sans-serif; word-break: keep-all; }
+  header.top { position: sticky; top: 0; z-index: 5; background: var(--bg); border-bottom: 1px solid var(--line); padding: 14px 20px 10px; }
+  h1 { margin: 0 0 6px; font-size: 20px; }
+  .sub { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+  #q { width: 100%; max-width: 640px; padding: 10px 14px; border: 1px solid var(--line); border-radius: 999px; background: var(--card); color: var(--text); font: inherit; }
+  nav.tabs { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 10px; }
+  nav.tabs a { padding: 4px 12px; border-radius: 999px; background: var(--chip); color: var(--accent); text-decoration: none; font-size: 13px; font-weight: 700; }
+  main { max-width: 1100px; margin: 0 auto; padding: 16px 20px 80px; }
+  section.box { background: var(--card); border: 1px solid var(--line); border-radius: 14px; padding: 16px 18px; margin: 16px 0; }
+  h2 { margin: 0 0 4px; font-size: 18px; }
+  h3 { margin: 18px 0 6px; font-size: 15px; }
+  p.note { margin: 0 0 10px; color: var(--muted); font-size: 13px; }
+  ol, ul { margin: 6px 0; padding-left: 22px; }
+  code, kbd { background: var(--code); padding: 1px 6px; border-radius: 6px; font: 13px/1.4 Consolas, monospace; }
+  table { width: 100%; border-collapse: collapse; font-size: 13.5px; }
+  th, td { text-align: left; vertical-align: top; padding: 8px 10px; border-top: 1px solid var(--line); }
+  th { color: var(--muted); font-size: 12px; font-weight: 700; border-top: 0; }
+  td.key { white-space: nowrap; }
+  .alias { display: inline-block; padding: 2px 9px; border-radius: 999px; background: var(--chip); color: var(--accent); font: 700 12px Consolas, monospace; cursor: copy; border: 0; }
+  .alias.done { background: var(--ok); color: #fff; }
+  tr.hide { display: none; }
+  .screen-head { display: flex; flex-wrap: wrap; gap: 10px; align-items: baseline; }
+  .route { color: var(--muted); font: 13px Consolas, monospace; }
+  .empty { display: none; padding: 24px; text-align: center; color: var(--muted); }
+  footer { color: var(--muted); font-size: 12px; text-align: center; padding: 20px; }
+  @media (max-width: 700px) { th:nth-child(n+4), td:nth-child(n+4) { display: none; } }
+</style>
+</head>
+<body>
+<header class="top">
+  <h1>TripLog 별칭 지도</h1>
+  <p class="sub">화면의 메뉴·버튼 이름으로 찾고, 별칭(영문 키)을 눌러 복사해서 "<b>FLIGHT 창에서 …</b>"처럼 말하면 됩니다.</p>
+  <input id="q" type="search" placeholder="찾을 말 입력: 예) 초대, 항공편, 로그아웃, 멤버, 지도, INVITE …" autocomplete="off" />
+  <nav class="tabs">
+    <a href="#how">사용법</a><a href="#screens">화면·메뉴 찾기</a><a href="#files">파일별 별칭</a><a href="#edit">자주 바꾸는 것</a><a href="#server">서버·SQL</a><a href="#flows">기능 흐름</a>
+  </nav>
+</header>
+
+<main>
+<section class="box" id="how">
+  <h2>사용법</h2>
+  <p class="note">별칭 = 화면의 한 부분에 붙인 이름표입니다. 같은 이름이 화면(HTML) · 코드(JS) · 스타일(CSS)에 모두 적혀 있어서 한 번에 찾을 수 있습니다.</p>
+  <ol>
+    <li><b>화면에서 바로 보기</b>: 주소 끝에 <code>?alias=1</code>을 붙여서 엽니다 (예: <code>http://localhost:8080/?alias=1#/main</code>). 또는 앱이 열린 상태에서 <kbd>Alt</kbd>+<kbd>Shift</kbd>+<kbd>A</kbd> (다시 누르면 끔). 각 부분에 점선 상자와 이름표(예: <code>FLIGHT · 항공편 추가 창</code>)가 겹쳐 보이고, 이름표를 누르면 별칭이 복사됩니다. 창(모달)은 열어 두면 그 창 이름표가 나타납니다.</li>
+    <li><b>이 문서에서 찾기</b>: 위의 검색창에 화면에 보이는 글자(예: "멤버 관리", "카카오톡")를 입력하면 해당하는 별칭·파일이 걸러집니다.</li>
+    <li><b>코드에서 찾기</b> (VS Code 등 전체 검색): JS/HTML은 <code>@별칭 FLIGHT</code>, CSS는 <code>[FLIGHT]</code>로 검색합니다. 파일 맨 위 두 줄이 그 파일의 별칭입니다.</li>
+    <li><b>저에게 요청할 때</b>: "<code>MYTRIP-RECS</code> 카드에서 버튼 문구를 바꿔줘", "<code>INVITE-MODAL</code>에 안내 문구 추가"처럼 별칭 + 하고 싶은 일을 적으면 정확히 그 부분만 고칩니다.</li>
+  </ol>
+  <p class="note">별칭은 바뀌지 않는 이름표라서, 화면 문구나 파일이 바뀌어도 그대로 씁니다. 새 화면·창을 만들면 같은 방식으로 별칭을 붙이고 이 문서에 한 줄 추가합니다.</p>
+</section>
+
+<section class="box" id="screens">
+  <h2>화면·메뉴 찾기</h2>
+  <p class="note">화면 하나(주소)마다 표가 하나씩입니다. "화면에 보이는 것"이 찾으려는 메뉴·버튼 이름이고, 오른쪽 열이 어디를 고치면 되는지입니다.</p>
+  <div id="screenList"></div>
+  <div class="empty" id="empty">검색 결과가 없어요. 다른 말로 찾아보세요.</div>
+</section>
+
+<section class="box" id="files">
+  <h2>파일별 별칭</h2>
+  <p class="note">위치: <code>D:\VibeCoding\Study_01\triplog\</code> 아래. 파일 맨 위 <code>// @별칭 …</code> 줄이 아래 표와 같습니다.</p>
+  <table id="fileTable"><thead><tr><th>별칭</th><th>파일</th><th>맡은 일</th></tr></thead><tbody></tbody></table>
+</section>
+
+<section class="box" id="edit">
+  <h2>자주 바꾸는 것 (어디를 고치나)</h2>
+  <table id="editTable"><thead><tr><th>바꾸고 싶은 것</th><th>별칭</th><th>어디를</th></tr></thead><tbody></tbody></table>
+</section>
+
+<section class="box" id="server">
+  <h2>서버·SQL (triplog 폴더 밖)</h2>
+  <p class="note">위치: <code>D:\VibeCoding\Study_01\supabase\</code>. SQL은 Supabase 대시보드 → SQL Editor에서 직접 실행합니다.</p>
+  <table id="serverTable"><thead><tr><th>이름</th><th>파일</th><th>내용</th></tr></thead><tbody></tbody></table>
+</section>
+
+<section class="box" id="flows">
+  <h2>기능 흐름 (어떤 별칭이 이어져 움직이나)</h2>
+  <div id="flowList"></div>
+</section>
+</main>
+<footer>이 문서는 <code>D:\VibeCoding\Study_01\comments.html</code> · 화면/파일을 추가·변경하면 이 문서의 아래쪽 데이터(SCREENS 등)를 함께 고칩니다.</footer>
+
+<script>
+// ---------------------------------------------------------------------------
+// 데이터: 여기만 고치면 문서가 바뀝니다.
+// 화면 표: [별칭, 화면에 보이는 것, 파일(triplog/js), HTML/DOM 위치, CSS 검색어·주요 클래스]
+// ---------------------------------------------------------------------------
+const SCREENS = [
+  { id: "MAIN", name: "메인 화면", route: "#/main", desc: "로그인 뒤 처음 보이는 화면. 내 여행 카드 목록과 새 여행 만들기.", files: "mainPage.js",
+    rows: [
+      ["MAIN", "메인 화면 전체", "mainPage.js (render)", "라우터가 만드는 main.page[data-page=main]", "[MAIN] · .page"],
+      ["MAIN-TOP", "✈️ 항공편 / 📰 여행 뉴스 자리 (추후 구현 문구)", "mainPage.js", ".main-top > .main-slot", ".main-top .main-slot"],
+      ["MAIN-TRIPS", "내 여행 카드 목록, '+ 새 여행' 버튼, '가져오기'/'여행 가져오기' 버튼(TRIP-IMPORT-MODAL을 mode:create로 엶), 빈 상태의 '새 여행 만들기'", "mainPage.js (tripCardHtml, sortTrips, openTripSetup, data-action=import-trip)", ".main-trips .trip-card", ".trip-card .main-new-btn .main-new-btn--import .empty-state"],
+      ["MAIN-ACCOUNT", "이름 · 프로필 사진 · 로그아웃 버튼", "mainPage.js (accountHtml, logout)", ".main-account", "[MAIN-ACCOUNT] .main-avatar .main-logout-btn"],
+    ] },
+  { id: "LOGIN", name: "로그인 화면", route: "#/login", desc: "구글 / 카카오 로그인 (네이버는 준비 중).", files: "loginPage.js, auth.js",
+    rows: [
+      ["LOGIN", "로그인 화면 전체 · 카카오톡 안에서 열면 나오는 안내 문구", "loginPage.js (inAppBrowserNote)", "main.page[data-page=login]", "[LOGIN] .login-note"],
+      ["LOGIN-BUTTONS", "구글로 / 카카오로 / 네이버로 시작하기 버튼 3개", "loginPage.js (PROVIDERS, signIn)", ".login .login-btn", ".login-btn--google .login-btn--kakao .login-btn--naver"],
+    ] },
+  { id: "INVITE-PAGE", name: "초대 수락 화면", route: "#/invite/:code", desc: "초대 링크를 열었을 때. 로그인 → 자동 참여 → 여행 페이지로 이동.", files: "invitePage.js",
+    rows: [
+      ["INVITE-PAGE", "초대 수락 화면 전체", "invitePage.js (render, accept)", "main.page[data-page=invite]", "[INVITE-PAGE]"],
+      ["INVITE-PAGE-BODY", "'초대를 확인하고 있어요' / '여행에 참여했어요!' / '유효하지 않은 초대링크입니다' / '다시 시도' 문구", "invitePage.js (setBody, showInvalid, showFailure)", ".invite-page", ".invite-page .invite-page-icon"],
+    ] },
+  { id: "MYTRIP", name: "나의 여행 화면", route: "#/my-trip/:id", desc: "여행 하나의 홈. 헤더, 참여 인원, 카테고리 탭, 추천 카드, 하단 탭.", files: "myTripPage.js, myTripData.js, tripMembers.js",
+    rows: [
+      ["MYTRIP", "나의 여행 화면 전체", "myTripPage.js (render)", "main.page[data-page=my-trip] > .mytrip-shell", "[MYTRIP]"],
+      ["MYTRIP-TOPBAR", "상단 아이콘 바: 닫기(X) · 검색 · 지도 · 메뉴(≡)", "myTripPage.js (ICONS, handleClick)", ".mytrip-bar", "[MYTRIP-TOPBAR] .mytrip-icon-btn"],
+      ["MYTRIP-HEADER", "여행지 · '두근두근 여행 D-n' · 날짜 알약 · 편집", "myTripPage.js (render, formatDateRange)", ".mytrip-header", "[MYTRIP-HEADER] .mytrip-dday .mytrip-date-pill"],
+      ["MEMBERS", "헤더 아래 참여 인원 아바타 (+N명, 멤버 관리 ›)", "tripMembers.js (mount, stackHtml)", "[data-members]", "[MEMBERS] .member-stack .member-avatar"],
+      ["MEMBERS-MANAGE", "'멤버 관리' 창: 멤버 목록, 내보내기 / 정말 내보내기 (owner만)", "tripMembers.js (openManage, kickMember)", "JS가 만드는 .modal-overlay", "[MEMBERS-MANAGE] .member-row .member-kick"],
+      ["MYTRIP-CATEGORY", "카테고리 탭: 가이드 · 항공 · 숙소 · 관광 · 맛집 · 혜택 · 투어·티켓 (+ 가이드의 준비/정보/관광/맛집)", "myTripPage.js (catsHtml, panelHtml) · 데이터 myTripData.js", ".mytrip-cats", "[MYTRIP-CATEGORY] .mytrip-cat .mytrip-subtab"],
+      ["MYTRIP-CATEGORY-LIST", "카테고리별 정보 목록 (예: 여권·비자 확인하기)", "myTripPage.js (panelHtml) · myTripData.js (getCategoryItems)", "[data-cat-panel]", "[MYTRIP-CATEGORY-LIST] .mytrip-list-item"],
+      ["MYTRIP-RECS", "'○○님을 위한 추천' 카드와 '내 일정에 담기' 버튼", "myTripPage.js (recsHtml) · myTripData.js (getRecommendations)", ".mytrip-recs .rec-card", "[MYTRIP-RECS] .rec-card .rec-add"],
+      ["MYTRIP-DAYPICKER", "'내 일정에 담기' 눌렀을 때 뜨는 Day 선택 창", "myTripPage.js (openDayModal, saveToDay)", "JS가 만드는 .modal-overlay", "[MYTRIP-DAYPICKER] .day-list .day-option"],
+      ["MYTRIP-BOTTOMTABS", "하단 탭: 여행중 · 일정 · 저장 · 여행도구", "myTripPage.js (TABS)", ".mytrip-tabs", "[MYTRIP-BOTTOMTABS] .mytrip-tab"],
+      ["MYTRIP-MENU", "우측 슬라이드 메뉴 (여행 공유·동행자 관리·알림 설정·여행 설정, 여행 삭제(만든 사람) / 여행 나가기(참여자), 로그아웃)", "myTripPage.js (MENU_ITEMS, setDrawer, logout)", ".mytrip-drawer", "[MYTRIP-MENU] .mytrip-panel .mytrip-menu .mytrip-menu-delete"],
+      ["MYTRIP-EXIT-CONFIRM", "'○○ 여행을 삭제할까요?'(만든 사람) / '○○에서 나갈까요?'(초대받은 참여자) 확인창 — 메뉴의 '여행 삭제' / '여행 나가기'를 누르면", "myTripPage.js (EXIT_TEXT, openExitModal, performExit) · storage.js (deleteTrip, leaveTrip)", "JS가 만드는 .modal-overlay", "[MYTRIP-EXIT-CONFIRM] .trip-exit-note"],
+    ] },
+  { id: "SCHEDULE", name: "일정 화면", route: "#/schedule/:id", desc: "Day별 일정 목록 + 위쪽 지도 + 빠른 메뉴. index.html에 원래 있는 화면을 그대로 씁니다.", files: "app.js(타임라인), schedule.js(일정 창), index.html",
+    rows: [
+      ["SCHEDULE-TOP", "일정 화면 위쪽 묶음 (헤더+초대+빠른 메뉴+지도), 스크롤해도 붙어 있음", "index.html", ".app-top", "[SCHEDULE] .app-top"],
+      ["SCHEDULE-HEADER", "← 뒤로 · 여행 제목(누르면 여행 설정) · D-day 배지", "app.js (renderTripHeader, openTripSetup) · dday.js", "header.app-header", "[SCHEDULE-HEADER] .app-header .dday-badge"],
+      ["INVITE", "👥 초대하기 버튼 (여행 만든 사람에게만 보임) · 같은 줄에 📥 가져오기 버튼(모든 참여자에게 보임, 아래 TRIP-IMPORT-MODAL 참고)", "invite.js (refresh, openInvite)", "#invite-row #invite-btn", "[INVITE] .invite-btn"],
+      ["QUICK-MENU", "+ 항공편 · + 숙소 · 여행지갑 · 가계부 (4개 모두 구현됨)", "app.js (initQuickMenu)", "nav.quick-menu", "[QUICK-MENU] .quick-menu-btn"],
+      ["DAY-MAP", "일정 지도(번호 핀·점선), 접기/펼치기 손잡이", "dayMap.js", "#day-map", "[DAY-MAP] .day-map .day-map-handle"],
+      ["TIMELINE", "Day 1, Day 2 … 섹션, 일정 카드, '장소 추가' / '메모 추가' 버튼", "app.js (renderTimeline, renderItemCard, enterSchedule)", "main#timeline", "[TIMELINE] .date-group .timeline-item .day-add-btn"],
+      ["SCHEDULE-FORM", "일정 추가·수정 창 (날짜·장소·좌표·메모·사진·삭제)", "schedule.js (openModal, handleSubmit)", "#modal-overlay #schedule-form", "[MODAL] · [FORM] · .modal"],
+      ["SCHEDULE-DELETE-CONFIRM", "'이 일정을 삭제할까요?' 확인창", "schedule.js (openConfirm, performDelete)", "#confirm-overlay", ".modal-confirm"],
+      ["MAP-PICKER", "지도에서 장소 선택 창 (검색·인기 장소·핀)", "mapPicker.js · googleMaps.js", "#map-modal-overlay", "[MAP-PICKER] .map-modal .poi-item"],
+      ["TRIP-SETUP", "여행 만들기·설정 마법사: ① 여행지 ② 날짜 (메인 '새 여행' + 일정 화면 제목 클릭)", "tripSetup.js · destinations.js(도시) · calendar.js", "#trip-modal-overlay", "[WIZARD] [CALENDAR] .pick-item .cal-day"],
+      ["FLIGHT", "항공편 추가 창: 먼저 선택 화면(항공권 사진으로 등록 / 직접 등록할게요). 사진 경로는 자동 인식 결과에 따라 Day·항공사 화면을 필요한 만큼만 보여주고 곧장 확인 화면으로, 직접 등록은 Day → 항공사+편명 → 시간·공항 확인 순서(수정 시에는 선택 화면 없이 바로 이 순서로 시작)", "flight.js (stepsFor) · flightData.js", "#flight-modal-overlay", "[FLIGHT] .flight-*"],
+      ["FLIGHT-DETAIL", "항공편 카드를 눌렀을 때 상세 창 (수정 / 삭제)", "flight.js (openDetail)", "#flight-detail-overlay", "[FLIGHT] .flight-detail"],
+      ["LODGING", "숙소 추가 창: 메뉴 → 검색/인기 → 체크인·체크아웃 날짜", "lodging.js · lodgingData.js · calendar.js", "#lodging-modal-overlay", "[LODGING] .lodging-*"],
+      ["INVITE-MODAL", "초대 링크 창: 링크 · 링크 복사 · 카카오톡으로 초대하기", "invite.js (shareToKakao, loadKakao, copyWhenReady)", "#invite-overlay", "[INVITE-MODAL] .invite-modal .invite-kakao-btn"],
+      ["TRIP-IMPORT-MODAL", "여행 가져오기 입력 창: 파일 / 텍스트 / 사진 탭(파일·사진은 첨부 한 자리를 공유, 텍스트는 별도) → '분석하기'. MAIN의 '가져오기'(새 여행 생성용, mode:create)와 SCHEDULE의 '📥 가져오기'(기존 여행에 추가, mode:append) 양쪽에서 열림", "tripImport.js (open, handleSubmit, applyAttachmentDataUrl)", "#trip-import-overlay", "[TRIP-IMPORT-MODAL] .trip-import-tab .trip-import-panel"],
+      ["TRIP-IMPORT-PREVIEW", "가져오기 분석 결과 확인·수정 창: 새 여행이면 제목·여행지·날짜 입력칸도 같이, 일정/비용 카드마다 카테고리·필드 수정 및 ✕ 삭제, 기존 여행에 추가할 때는 겹치는 항목에 '기존 일정/비용 교체됨' 표시. '등록하기'가 실제 저장을 한다", "tripImportPreview.js (open, markDuplicates, handleSubmit, saveSequentially)", "#trip-import-preview-overlay", "[TRIP-IMPORT-PREVIEW] .trip-import-preview-card"],
+    ] },
+  { id: "BUDGET", name: "가계부 화면", route: "#/budget/:id", desc: "PRD v6. 일정 화면과 같은 Day별 구조로 지출을 보여주는 새 화면(모달 아님). 목록·합계에 이어 비용 추가/수정(EXPENSE-FORM)까지 구현됨. 삭제는 아직 없음.", files: "budgetPage.js, currencyData.js, expenseCategoryData.js, expenseForm.js",
+    rows: [
+      ["BUDGET", "가계부 화면 전체, 상단 ← 뒤로가기 · 제목 — 일정(SCHEDULE) 화면으로 돌아간다", "budgetPage.js (render)", "main.page[data-page=budget] > .budget-shell", "[BUDGET] .budget-header .budget-back"],
+      ["BUDGET", "여행준비 / Day1~N 섹션, 지출 카드(아이콘+제목+금액), '+ 비용 추가' 버튼, 빈 상태 문구", "budgetPage.js (buildSections, sectionHtml, expenseItemHtml, openAddExpense)", ".budget-scroll .budget-day-section", "[BUDGET] .budget-item .budget-empty .budget-add-btn"],
+      ["BUDGET", "하단 고정 '전체 지출' 합계(₩)", "budgetPage.js (totalKrw, formatTotal)", ".budget-total-bar", "[BUDGET] .budget-total-bar .budget-total-amount"],
+      ["EXPENSE-FORM", "'비용 추가/수정' 창: 통화·금액, 날짜(칩), 결제수단(라디오), 제목, 카테고리(가로 스크롤 칩), 여행 멤버(결제/나누기 체크박스), 메모. 지출 카드를 누르면 같은 창이 수정 모드로 열림", "expenseForm.js (open, handleSubmit, renderMemberList) · storage.js (addExpense, updateExpense, loadMembers)", "JS가 만드는 .modal-overlay", "[EXPENSE-FORM] .expense-category-chips .expense-member-row"],
+    ] },
+  { id: "WALLET", name: "여행지갑 화면", route: "#/wallet", desc: "PRD v7. 특정 여행에 매이지 않는 개인 문서함(여권·항공권·QR코드 등). 카테고리 필터 + 2열 카드 그리드 + 업로드 창 + 상세 보기(삭제 포함). 목록은 빈 상태로 시작해 업로드/삭제가 그때그때 캐시에 반영되고, 서버에서 통째로 다시 읽어오는 조회는 아직 다음 단계.", files: "walletPage.js, walletCategoryData.js, walletForm.js, walletViewer.js",
+    rows: [
+      ["WALLET", "여행지갑 화면 전체, 상단 ← 뒤로가기(열려던 여행의 SCHEDULE로, 현재 여행이 없으면 MAIN으로) · 제목", "walletPage.js (render)", "main.page[data-page=wallet] > .wallet-shell", "[WALLET] .wallet-header .wallet-back"],
+      ["WALLET", "카테고리 필터 칩(전체·여권·항공권·QR코드·숙소예약·기타), 원형 아이콘+아래 작은 글자(가계부 카테고리와 같은 스타일)", "walletPage.js (filterChipsHtml) · walletCategoryData.js (WALLET_CATEGORIES)", ".wallet-filter-chips", "[WALLET] .wallet-filter-item .wallet-filter-icon"],
+      ["WALLET", "2열 카드 그리드: 사진은 그대로(서명된 URL), PDF는 아이콘+파일명, 카드 하단 제목, 빈 상태 '아직 등록된 문서가 없어요'", "walletPage.js (cardHtml, hydrateImages) · storage.js (getWalletItems, 빈 상태로 시작 + 업로드/삭제 캐시)", ".wallet-grid .wallet-card", "[WALLET] .wallet-card-image .wallet-card-pdf"],
+      ["WALLET", "우측 하단 고정 '+' 버튼 — walletForm.js의 업로드 창을 연다", "walletPage.js (data-action='add')", ".wallet-fab", "[WALLET] .wallet-fab"],
+      ["WALLET-FORM", "문서 업로드 창: 파일 선택 3버튼(사진에서 선택·직접 찍기·PDF·파일 선택) · 미리보기 · 카테고리(칩) · 제목 · 설명 · 저장", "walletForm.js (open, handleFileChosen, handleSubmit) · storage.js (addWalletItem)", "JS가 만드는 .modal-overlay", "[WALLET-FORM] .wallet-picker-row .wallet-form-category-item"],
+      ["WALLET-VIEWER", "카드를 누르면 여는 전체화면 보기: 제목·카테고리·설명, 이미지(핀치·드래그·더블클릭·Ctrl+휠로 확대/이동), PDF(iframe + 새 탭 링크), 삭제, 닫기(X)", "walletViewer.js (open, bindZoomHandlers, performDelete) · storage.js (getWalletFileUrl, deleteWalletItem)", "JS가 만드는 .modal-overlay.wallet-viewer-overlay", "[WALLET-VIEWER] .wallet-viewer-image-wrap .wallet-viewer-pdf"],
+      ["WALLET-VIEWER-DELETE-CONFIRM", "'이 문서를 삭제할까요?' 확인창", "walletViewer.js (ensureConfirmModal, performDelete)", "JS가 만드는 .modal-overlay", "[WALLET-VIEWER-DELETE-CONFIRM] .modal-confirm"],
+    ] },
+  { id: "COMMON", name: "공통 부품 (여러 화면에서 씀)", route: "(모든 화면)", desc: "알림창·토스트·별칭 보기.", files: "ui.js, aliasView.js",
+    rows: [
+      ["UI-ALERT", "알럿창 ('준비 중', 오류 안내 등)", "ui.js (showAlert, showComingSoon)", "JS가 만드는 .alert-overlay", "[UI] .alert-overlay"],
+      ["UI-TOAST", "아래에서 잠깐 뜨는 토스트 ('링크가 복사되었어요' 등)", "ui.js (showToast)", "#toast", "[UI] .toast"],
+      ["ALIAS-VIEW", "별칭 보기(개발용) 이름표", "aliasView.js", "#alias-layer", "[ALIAS-VIEW] .alias-tag"],
+    ] },
+];
+
+const FILES = [
+  ["APP", "js/app.js", "앱 시작을 연결하고 일정 화면(타임라인)을 그린다. 화면 접근 규칙(로그인 필요·redirect)도 여기."],
+  ["ROUTER", "js/router.js", "#/main, #/my-trip/:id, #/schedule/:id, #/login, #/invite/:code 이동과 가드"],
+  ["MAIN", "js/mainPage.js", "메인 화면"], ["LOGIN", "js/loginPage.js", "로그인 화면"], ["INVITE-PAGE", "js/invitePage.js", "초대 수락 화면"],
+  ["MYTRIP", "js/myTripPage.js", "나의 여행 화면"], ["MYTRIP-DATA", "js/myTripData.js", "나의 여행의 예시(더미) 목록·추천 카드"], ["MEMBERS", "js/tripMembers.js", "참여 인원 아바타 · 멤버 관리 창"],
+  ["SCHEDULE-FORM", "js/schedule.js", "일정 추가·수정·삭제 창"], ["DAY-MAP", "js/dayMap.js", "일정 화면 지도(번호 핀·점선)"], ["MAP-PICKER", "js/mapPicker.js", "지도에서 장소 선택 창"],
+  ["FLIGHT", "js/flight.js", "항공편 추가·상세 창 (항공권 사진 자동입력 포함)"], ["FLIGHT-DATA", "js/flightData.js", "항공사·공항 데이터, 항공편 조회"],
+  ["LODGING", "js/lodging.js", "숙소 추가 창"], ["LODGING-DATA", "js/lodgingData.js", "숙소 검색(구글 장소)"],
+  ["TRIP-SETUP", "js/tripSetup.js", "여행 만들기·설정 마법사"], ["DESTINATIONS", "js/destinations.js", "선택할 수 있는 여행지(도시) 목록"], ["CALENDAR", "js/calendar.js", "달력(여행 기간·숙소 날짜 공용)"],
+  ["INVITE", "js/invite.js", "초대하기 버튼 · 초대 링크 창 · 카카오톡 공유"],
+  ["TRIP-IMPORT-MODAL", "js/tripImport.js", "여행 가져오기 입력 창 (파일/텍스트/사진 탭 → analyze-trip-import 호출)"],
+  ["TRIP-IMPORT-PREVIEW", "js/tripImportPreview.js", "가져온 일정·비용 미리보기/수정, 중복 표시, 실제 저장(등록하기)"],
+  ["STORAGE", "js/storage.js", "여행·일정·멤버를 서버(Supabase)에 저장/조회하는 모든 함수"], ["AUTH", "js/auth.js", "로그인 상태, 로그인 뒤 돌아갈 경로"], ["SUPABASE", "js/supabaseClient.js", "Supabase 서버 연결"],
+  ["GOOGLE-MAPS", "js/googleMaps.js", "구글 지도·장소 검색 호출 모음"], ["IMAGES", "js/images.js", "일정 사진(브라우저 저장)"],
+  ["DDAY", "js/dday.js", "D-day 문구 계산·갱신"], ["UTIL", "js/util.js", "날짜 계산·문자 이스케이프 등 공용 도구"], ["UI", "js/ui.js", "알럿·토스트"], ["CONFIG", "js/config.js", "API 키 · 로그인 필수 여부 · 카카오 키/이미지"],
+  ["ALIAS-VIEW", "js/aliasView.js", "별칭 보기(개발용)"],
+  ["CURRENCY-DATA", "js/currencyData.js", "가계부 통화 목록·KRW 환산율(대략값)"],
+  ["EXPENSE-CATEGORY-DATA", "js/expenseCategoryData.js", "가계부 지출 카테고리 7개(항공/숙소/교통/식비/쇼핑/투어/기타)"],
+  ["BUDGET", "js/budgetPage.js", "가계부 화면 (#/budget/:id)"],
+  ["EXPENSE-FORM", "js/expenseForm.js", "비용 추가/수정 창 (통화·금액·날짜 드롭다운·결제수단·제목·카테고리·여행 멤버·메모, 전부 구현됨)"],
+  ["WALLET-CATEGORY-DATA", "js/walletCategoryData.js", "여행지갑 카테고리 5개(여권/항공권/QR코드/숙소예약/기타)"],
+  ["WALLET", "js/walletPage.js", "여행지갑 화면 (#/wallet)"],
+  ["WALLET-FORM", "js/walletForm.js", "문서 업로드 창 (파일 선택·미리보기·카테고리·제목·설명 → Storage 업로드 + DB 기록)"],
+  ["WALLET-VIEWER", "js/walletViewer.js", "문서 상세 보기 (전체화면, 이미지 핀치·드래그 확대, PDF iframe, 삭제)"],
+  ["(CSS)", "css/style.css", "모든 스타일. 맨 위 목차(1~18)와 각 구역 제목에 [별칭]이 적혀 있음. 색·간격은 1번 구역(:root)의 토큰"],
+  ["(HTML)", "index.html", "일정 화면과 여러 창(모달)의 뼈대. 각 블록 위에 <!-- @별칭 … --> 주석"],
+  ["(배포)", "vercel.json · package.json", "Vercel 배포 설정(빌드 없음, 캐시·보안 헤더)"],
+];
+
+const EDITS = [
+  ["색·둥근 정도·간격을 바꾸기", "TOKENS", "css/style.css 1번 구역 :root (--accent, --mint, --radius-*, --space-* …)"],
+  ["도시(여행지)를 추가", "DESTINATIONS", "js/destinations.js (CITIES, 그룹) · 항공편 기본 공항은 js/flightData.js CITY_AIRPORTS"],
+  ["나의 여행의 추천 카드·목록 문구", "MYTRIP-DATA", "js/myTripData.js (getRecommendations, getCategoryItems, CATEGORY_META)"],
+  ["나의 여행 우측 메뉴 항목", "MYTRIP-MENU", "js/myTripPage.js MENU_ITEMS"],
+  ["카카오톡 공유 문구·이미지", "INVITE-MODAL", "문구: js/invite.js shareToKakao / 이미지·키: js/config.js (inviteImageUrl, kakaoJsKey)"],
+  ["초대 링크 유효기간(7일)", "서버", "supabase/migrations/001 trip_invites.expires_at 기본값 (SQL로 변경)"],
+  ["로그인 필수 끄기", "CONFIG", "js/config.js requireLogin"],
+  ["로그인 버튼/문구", "LOGIN", "js/loginPage.js PROVIDERS, render"],
+  ["참여 인원 아바타 개수(3개)", "MEMBERS", "js/tripMembers.js MAX_AVATARS"],
+  ["일정 카드 모양·정렬", "TIMELINE", "js/app.js renderItemCard / renderTimeline(정렬 sortKey), CSS [TIMELINE]"],
+  ["항공사 목록 추가", "FLIGHT-DATA", "js/flightData.js AIRLINES"],
+  ["'준비 중' 메뉴로 새 버튼 추가", "QUICK-MENU", "js/app.js initQuickMenu (새 data-menu 값을 if/else에 추가)"],
+  ["알림/토스트 문구", "UI", "각 기능 파일의 ui.showToast(...) / ui.showAlert(...) 호출부 (문구로 전체 검색)"],
+  ["가져오기가 인식하는 일정/비용 카테고리", "TRIP-IMPORT-PREVIEW", "일정 카테고리는 js/myTripData.js CATEGORY_META(6개), 비용 카테고리는 js/expenseCategoryData.js EXPENSE_CATEGORIES(7개) — 서버 supabase/functions/analyze-trip-import도 같은 값으로 검증하므로 같이 맞춰야 함"],
+];
+
+const SERVER = [
+  ["001 초대 기능 스키마", "supabase/migrations/001_invite_feature.sql", "테이블 trips · schedule_items · trip_members · trip_invites, RLS 정책, 여행 생성 시 owner 자동 등록 트리거, 초대 수락 함수 accept_trip_invite"],
+  ["002 항공권 열", "supabase/migrations/002_flight_ocr.sql", "schedule_items에 airline · flight_no 열 추가 (001 다음)"],
+  ["003 멤버 프로필", "supabase/migrations/003_member_profiles.sql", "get_trip_members 함수: 멤버끼리 이름·프로필 사진 조회 (참여 인원 표시용)"],
+  ["004 여행 나가기", "supabase/migrations/004_leave_trip.sql", "trip_members 삭제 정책 추가: 참여자(editor)가 자기 멤버십만 스스로 삭제 (owner는 불가). 앱의 여행 나가기 메뉴에 필요"],
+  ["005 가계부", "supabase/migrations/005_budget.sql", "expenses 테이블(PRD v6) + RLS. 004와 번호가 겹치지 않게 005로 만듦. #/budget/:id 화면이 이 테이블을 읽는다(005 실행 전에는 목록이 비어 보이고 토스트로 안내)"],
+  ["006 여행지갑", "supabase/migrations/006_wallet.sql", "wallet_items 테이블(PRD v7) + RLS('본인만 조회/수정', 여행 멤버에게도 비공개) + storage.objects 정책('wallet' 버킷, 경로가 내 uid/…일 때만). 버킷 자체는 대시보드에서 직접 만들어야 함(파일 맨 아래 안내). WALLET-FORM이 업로드·insert, WALLET-VIEWER가 삭제(Storage remove + DB delete)를 실제로 하지만, WALLET 화면이 서버에서 목록을 통째로 다시 읽어오는 조회는 아직 없다(캐시만 갱신)"],
+  ["항공권 사진 인식", "supabase/functions/analyze-ticket/index.ts (+README.md)", "Edge Function. 항공권 사진 → Gemini → 항공편 정보. 배포·비밀값은 README 참고"],
+  ["여행 가져오기 분석", "supabase/functions/analyze-trip-import/index.ts (+README.md)", "Edge Function. 파일(이미지/PDF)·텍스트·사진 중 있는 것을 Gemini에 보내 여행(trip)·일정(scheduleItems)·비용(expenses) 초안을 뽑아 반환. GEMINI_API_KEY·GEMINI_MODEL 비밀값을 analyze-ticket과 공유(하나를 바꾸면 둘 다 바뀜)"],
+];
+
+const FLOWS = [
+  ["초대하기 → 참여 (계정 A → 계정 B)", [
+    "A: SCHEDULE의 <b>INVITE</b> 버튼 → <b>INVITE-MODAL</b>이 열림 (invite.js가 trip_invites에서 유효한 코드를 찾거나 새로 만듦)",
+    "A: 링크 자동 복사, 또는 <b>카카오톡으로 초대하기</b> (카카오 SDK는 이때 처음 불러옴)",
+    "B: 링크 <code>…/#/invite/코드</code> 열기 → 로그인 안 했으면 <b>LOGIN</b> (redirect가 기억됨) → 로그인 뒤 <b>INVITE-PAGE</b>로 복귀",
+    "B: INVITE-PAGE가 서버 함수 accept_trip_invite 호출 → 멤버(editor) 등록 → '여행에 참여했어요!' → <b>MYTRIP</b>으로 이동",
+    "A: <b>MYTRIP</b>의 <b>MEMBERS</b>에 B가 보이고, <b>MEMBERS-MANAGE</b>에서 내보내기 가능",
+  ]],
+  ["일정 저장 (어느 화면에서든)", [
+    "화면(SCHEDULE-FORM / FLIGHT / LODGING / MYTRIP-DAYPICKER)이 <b>STORAGE</b>의 addItem·updateItem·deleteItem 호출",
+    "STORAGE가 Supabase의 schedule_items에 저장 (권한은 서버 RLS가 결정) → 성공하면 화면 갱신, 실패하면 창을 닫지 않고 오류 표시",
+    "일정 화면에 들어올 때마다 loadItems로 서버 최신 데이터를 받아 그림 (다른 사람이 추가한 일정도 이때 반영)",
+  ]],
+  ["여행 만들기", [
+    "MAIN의 '+ 새 여행' → <b>TRIP-SETUP</b> (여행지 → 날짜) → <b>STORAGE</b> createTrip (owner_id 저장) → 서버 트리거가 owner 멤버 등록 → 메인 목록에 카드 추가",
+  ]],
+  ["여행 가져오기 (파일·텍스트·사진 → 자동 등록)", [
+    "MAIN의 '가져오기'(새 여행용) 또는 SCHEDULE의 '📥 가져오기'(현재 여행에 추가용) → <b>TRIP-IMPORT-MODAL</b>",
+    "파일/텍스트/사진 중 채운 것으로 '분석하기' → Edge Function <code>analyze-trip-import</code> 호출 → 성공하면 이 창은 닫히고 <b>TRIP-IMPORT-PREVIEW</b>가 열림 (실패하면 이 창에 오류 문구, 입력은 그대로 유지)",
+    "미리보기에서 새 여행이면 제목·여행지·날짜를 채우고, 일정·비용 카드마다 카테고리·내용을 고치거나 ✕로 지움 (기존 여행에 추가하는 경우 겹치는 항목엔 '기존 일정/비용 교체됨' 표시)",
+    "'등록하기' → 새 여행이면 먼저 <b>STORAGE</b> createTrip, 이후 일정·비용을 하나씩 순서대로 저장 (일부만 실패하면 성공한 것은 화면에서 지우고 실패한 것만 남겨 재시도 가능) → 모두 성공하면 그 여행의 <b>MYTRIP</b>(새 여행) 또는 <b>SCHEDULE</b>(기존 여행)로 이동",
+  ]],
+];
+
+// ---------------------------------------------------------------------------
+// 화면 그리기
+// ---------------------------------------------------------------------------
+const esc = (s) => String(s).replace(/[&<>"]/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;" }[c]));
+const aliasBtn = (k) => `<button class="alias" type="button" data-copy="${esc(k)}" title="누르면 복사">${esc(k)}</button>`;
+
+document.getElementById("screenList").innerHTML = SCREENS.map((s) => `
+  <div class="screen" data-search="${esc([s.id, s.name, s.route, s.desc, s.files].join(" "))}">
+    <h3 class="screen-head">${aliasBtn(s.id)} ${esc(s.name)} <span class="route">${esc(s.route)}</span></h3>
+    <p class="note">${esc(s.desc)} · 파일: <code>${esc(s.files)}</code></p>
+    <table><thead><tr><th>별칭</th><th>화면에 보이는 것</th><th>코드 (js/)</th><th>HTML / DOM</th><th>CSS 검색어</th></tr></thead><tbody>
+    ${s.rows.map((r) => `<tr data-search="${esc(r.join(" "))}"><td class="key">${aliasBtn(r[0])}</td><td>${esc(r[1])}</td><td><code>${esc(r[2])}</code></td><td><code>${esc(r[3])}</code></td><td><code>${esc(r[4])}</code></td></tr>`).join("")}
+    </tbody></table>
+  </div>`).join("");
+
+const fill = (id, rows, cells) => { document.querySelector(`#${id} tbody`).innerHTML = rows.map((r) => `<tr data-search="${esc(r.join(" "))}">${cells(r)}</tr>`).join(""); };
+fill("fileTable", FILES, (r) => `<td class="key">${aliasBtn(r[0])}</td><td><code>${esc(r[1])}</code></td><td>${esc(r[2])}</td>`);
+fill("editTable", EDITS, (r) => `<td>${esc(r[0])}</td><td class="key">${aliasBtn(r[1])}</td><td>${esc(r[2])}</td>`);
+fill("serverTable", SERVER, (r) => `<td>${esc(r[0])}</td><td><code>${esc(r[1])}</code></td><td>${esc(r[2])}</td>`);
+document.getElementById("flowList").innerHTML = FLOWS.map(([t, steps]) => `<div class="flow" data-search="${esc(t + steps.join(" "))}"><h3>${esc(t)}</h3><ol>${steps.map((x) => `<li>${x}</li>`).join("")}</ol></div>`).join("");
+
+// 복사
+document.addEventListener("click", (e) => {
+  const b = e.target.closest("[data-copy]"); if (!b) return;
+  const done = () => { const t = b.textContent; b.textContent = t + " ✓"; b.classList.add("done"); setTimeout(() => { b.textContent = t; b.classList.remove("done"); }, 900); };
+  (navigator.clipboard ? navigator.clipboard.writeText(b.dataset.copy) : Promise.reject()).then(done, () => { const i = document.createElement("input"); i.value = b.dataset.copy; document.body.appendChild(i); i.select(); document.execCommand("copy"); i.remove(); done(); });
+});
+
+// 검색: 표의 행·흐름·화면 블록을 걸러낸다
+const q = document.getElementById("q");
+q.addEventListener("input", () => {
+  const words = q.value.trim().toLowerCase().split(/\s+/).filter(Boolean);
+  const match = (el) => words.every((w) => el.dataset.search.toLowerCase().includes(w));
+  let any = false;
+  document.querySelectorAll(".screen").forEach((sc) => {
+    const rows = [...sc.querySelectorAll("tbody tr")];
+    const screenHit = words.length && match(sc);
+    let shown = 0;
+    rows.forEach((r) => { const hit = !words.length || screenHit && !words.some((w) => !sc.dataset.search.toLowerCase().includes(w)) || match(r); r.classList.toggle("hide", !hit); if (hit) shown++; });
+    sc.style.display = shown ? "" : "none";
+    if (shown) any = true;
+  });
+  document.getElementById("empty").style.display = any || !words.length ? "none" : "block";
+  document.querySelectorAll("#fileTable tbody tr, #editTable tbody tr, #serverTable tbody tr, .flow").forEach((r) => { const hit = !words.length || match(r); r.classList.toggle("hide", !hit); r.style.display = hit ? "" : "none"; });
+});
+</script>
+</body>
+</html>

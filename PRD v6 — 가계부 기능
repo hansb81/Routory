@@ -1,0 +1,66 @@
+PRD v6 — 가계부 기능
+1. 개요
+SCHEDULE -> QUICK-MENU 에서 진입하는 여행 가계부 기능. 일정과 동일한 'Day별 리스트' 구조를 재사용하고, 각 항목에 비용을 추가해 여행 전체 지출을 관리한다. 이번 범위는 기존 웹 방식(Supabase 직접 연결) 그대로 진행하며, 앱스토어/Capacitor/광고 관련 작업은 제외한다.
+2. 진입 경로
+• SCHEDULE -> QUICK-MENU에 준비중으로 만들어놨던 가계부 사용
+• 클릭 시 새 페이지(/budget/:tripId)로 이동 (모달 아님)
+3. 가계부 메인 페이지 — 리스트 구성
+• 일정 페이지와 동일한 구조: '여행준비' + Day1~DayN 섬션으로 구분
+• 각 섬션 안에 해당 날짜에 등록된 비용 항목이 리스트로 표시 (일정의 '장소 추가'와 비슷한 카드 형태: 카테고리 아이콘 + 제목 + 금액)
+• 각 섬션 상단(또는 하단)에 '비용 추가' 버튼
+4. 하단 합계 영역
+• 페이지 하단에 전체 지출 합계 고정 표시 (스크롤해도 계속 보임)
+• 여러 통화가 섮여 있을 수 있으므로, KRW 환산 금액으로 합계를 보여줌 (계산 방식은 6번 데이터 모델 참고)
+5. 비용 추가/수정 폼
+5-1) 통화 선택 + 금액 입력
+• 통화 선택은 입력란 왜쪽에 붙여 배치, 기본값 KRW(원)
+• 클릭 시 드롭다운으로 선택지 표시: '나라 - 통화기호(통화기호 한글)' 형식
+    ◦ 예: 대한민국 - ₩(원), 미국 - $(달러), 여행지 통화(예: 베트남 - ₫(동))
+    ◦ 선택지: 원화, 달러, 여행지 통화 3개 (여행지 통화가 이미 달러/원화와 같으면 중복 제외)
+    ◦ 여행지 → 통화 매핑은 다음 공유에서 지정한 Trip.destination 기준으로 대응하는 작은 데이터 테이블 사용 (국가명, 기호, 한글명)
+• 금액 입력란(숫자, 수정 가능)
+5-2) 날짜 선택
+• 3번 리스트의 섬션(여행준비 / Day1~DayN) 중 하나를 선택
+5-3) 결제수단
+• 현금 또는 카드 중 하나 선택 (라디오 버튼 등)
+5-4) 제목
+• 텍스트 입력, 3번 리스트의 아이템 제목으로 표시됨
+5-5) 카테고리
+• 항공, 숙소, 교통, 식비, 쇼핑, 투어, 기타 7개, 이미지(아이콘)와 함께 표시
+• 한 화면에 다 들어오지 않으면 가로 스크롤되는 칩(chip) 형태로 구성
+5-6) 여행 멤버
+• 전체 멤버가 리스트로 표시됨: 썰네일(프로필 이미지) + 이름 + 체크박스 2개(결제, 나누기)
+• '결제' / '나누기' 텍스트 라벨은 멤버 리스트 우측 상단에 한 번만 표시, 각 체크박스와 수직으로 정렬
+• 결제: 이 비용을 실제로 지불한 사람 (복수 선택 가능하도록 구현, 보통은 1명)
+• 나누기: 이 비용을 여러 명이 나누어 내는 사람들 (복수 선택)
+5-7) 메모
+• 자유 텍스트 입력란 (선택)
+6. 데이터 모델
+create table expenses (
+  id uuid primary key default gen_random_uuid(),
+  trip_id uuid references trips(id) on delete cascade,
+  day_key text not null, -- 'prep' 또는 'YYYY-MM-DD'
+  amount numeric not null,
+  currency text not null, -- 'KRW' | 'USD' | 여행지 통화코드(예: 'VND')
+  krw_amount numeric,     -- 저장 시점 환율로 환산한 KRW 값 (합계 계산용, 근사치)
+  payment_method text check (payment_method in ('cash','card')),
+  title text not null,
+  category text not null, -- flight|lodging|transport|meal|shopping|tour|etc
+  payer_ids uuid[] default '{}',   -- 결제한 사람들 (trip_members user_id)
+  split_ids uuid[] default '{}',   -- 나눠 낸 사람들
+  memo text,
+  created_by uuid references auth.users(id),
+  created_at timestamptz default now(),
+  updated_at timestamptz default now()
+);
+
+alter table expenses enable row level security;
+create policy "멤버만 조회/수정" on expenses for all
+  using (trip_id in (select trip_id from trip_members where user_id = auth.uid()));
+통화 → 환율 매핑 (MVP, 간단한 고정값)
+KRW/USD 및 주요 여행지 통화에 대해 코드 내 고정 환율 테이블을 둔다 (예: 1 USD = 1,350 KRW). 실시간 환율 API는 이번 범위에서 제외.
+7. 오픈 이슈 (기본값으로 진행)
+• 환율은 코드에 고정값으로 박아둔 (실시간 API 연동은 다음 버전에서 검토)
+• '결제'는 복수 선택 가능하게 구현 (1명으로 제한하지 않음, 필요시 UI단에서 안내)
+• 여행지 통화 매핑 데이터는 자주 쓰는 여행지 10~15군데(일본/베트남/태국/유럽권 등)으로 더미 구성, 필요시 보강
+• 카테고리/보기/순서 등은 지금은 UI로만 반영, 나중에 멤버별/카테고리별 통계 화면으로 확장 가능

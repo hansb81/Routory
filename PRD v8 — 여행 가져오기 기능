@@ -1,0 +1,48 @@
+PRD v8 — 여행 가져오기 기능
+1. 개요
+파일(PDF/문서), 텍스트, 사진을 업로드하면 AI가 분석해서 여행 일정/가계부를 자동으로 등록하는 기능. 항공권 자동인식(PRD v4)에서 구축한 Gemini 기반 분석 Edge Function 패턴을 확장해서 사용한다.
+2. 진입 지점 2곳, 동작이 다름
+2-1) MAIN 페이지 — 새 여행 생성
+• '+새 여행' 버튼 연에 '여행 가져오기' 버튼 추가
+• 분석 결과로: 새 Trip 생성(title/destination/startDate/endDate) + Day별 일정 자동 등록 + 가계부 자동 등록
+• 여행지갑은 자동 등록하지 않음 — 사용자가 직접 등록해야 함 (여권/항공권 사진은 개인정보라 AI가 임의로 저장하지 않도록 설계)
+2-2) SCHEDULE(나의 여행) 페이지 — 기존 여행에 추가/갱신
+• 상단 '초대하기' 버튼 사이즈를 줄이고, 그 옷에 '가져오기' 버튼을 나란히 배치
+• 분석 결과로 현재 여행에 Day별 일정 추가/갱신 + 가계부 추가/갱신
+• 중복되는 항목은 새로 만들지 않고 기존 항목을 교체(update)
+3. 입력 방식 (공통 업로드 모달)
+진입 지점 2곳 모두 동일한 모달 재사용:
+1. 파일: PDF/이미지 파일 선택 (accept="application/pdf,image/*")
+2. 텍스트: 여행 일정이 담긴 텍스트를 직접 붙여넣는 텍스트어리아
+3. 사진: 갤러리 선택 / 직접 촬영
+4. AI 분석 설계 — analyze-trip-import Edge Function (신규)
+PRD v4의 analyze-ticket과 별개로 새 Edge Function을 만든다 (역할이 다름 — 단일 항목이 아니라 여러 일정/비용을 한번에 추출).
+[클라이언트] 파일/사진 → base64 변환 (저장 X, 항공권 기능과 동일한 원칙) / 텍스트 → 그대로 전달
+   ↓ Edge Function 호출 (analyze-trip-import)
+[Edge Function]
+   ↓ Gemini API 호출, 응답 형식(JSON 강제):
+   {
+     "trip": { "title": "", "destination": "", "startDate": "YYYY-MM-DD", "endDate": "YYYY-MM-DD" } | null,
+     "scheduleItems": [ { "date": "YYYY-MM-DD", "time": "HH:mm"|null, "category": "flight|lodging|meal|sightseeing|shopping|etc", "title": "", "place": ""|null, "memo": ""|null } ],
+     "expenses": [ { "dayKey": "YYYY-MM-DD"|"prep", "amount": 0, "currency": "KRW", "category": "flight|lodging|transport|meal|shopping|tour|etc", "title": "" } ]
+   }
+   ↓ 파싱 실패/모호하면 빈 배열로 폴백
+[클라이언트]
+   ↓ 미리보기 화면에 모두 표시 → 사용자가 항목별 확인/수정/삭제 후 '등록' 확정
+5. 미리보기 확인 화면 (중요 — 자동 저장 X)
+항공권 기능과 동일한 원칙: AI 결과를 바로 DB에 쓰지 않고, 미리보기 리스트로 보여줘 사용자가 확인하게 함.
+• 추출된 일정 각 항목을 수정/삭제 가능한 카드로 나열
+• 추출된 비용 항목도 동일하게 나열
+• 하단에 '등록하기' 버튼 → 이 시점에만 실제 DB에 반영
+6. 중복 처리 로직 (SCHEDULE 페이지에서 가져오기 시만 해당)
+• 일정: 같은 tripId + 같은 date + title이 공백/대소문자 무시하고 일치하면 기존 ScheduleItem을 update, 아니면 새로 insert
+• 가계부: 같은 tripId + 같은 day_key + title이 일치하면 기존 expense를 update, 아니면 insert
+• 교체된 항목은 미리보기 화면에서 '기존 항목 교체됨' 배지로 구분 표시
+7. 버튼 UI 변경
+• SCHEDULE 페이지 상단 헤더: 기존 '초대하기' 버튼을 작게 줄이고, 바로 옷에 같은 크기의 '가져오기' 버튼을 나란히 배치 (둘 다 아이콘+짧은 텍스트 조합)
+• MAIN 페이지: '+새 여행' 옷에 동일한 스타일로 '여행 가져오기' 버튼
+8. 오픈 이슈 (기본값으로 진행)
+• 분석 정확도가 낮을 수 있으므로 미리보기 확인 단계를 반드시 거침 (자동 저장 금지)
+• 중복 매칭은 정확한 문자열 일치만 사용 (유사도 매칭은 이번 범위에서 제외, 나중에 필요하면 추가)
+• 사진/파일은 분석후 저장하지 않음 (항공권 기능과 동일)
+• MAIN에서 생성 시 날짜 범위를 AI가 못 찾으면 생성 실패 처리하고 직접 입력하도록 안내

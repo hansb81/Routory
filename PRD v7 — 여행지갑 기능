@@ -1,0 +1,43 @@
+PRD v7 — 여행지갑 기능
+1. 개요
+SCHEDULE 페이지 QUICK-MENU의 '체크리스트' 항목을 '여행지갑'으로 교체. 여권, 항공권, QR코드 등 여행에 필요한 이미지/문서를 한곳에 모아두는 개인용 보관함. MVP는 이미지(PNG/PDF) 등록 + 설명만 지원하며, 앱스토어 관련 작업은 제외.
+2. 참고 사례
+WalletKit, Tripfolio 같은 기존 앱들은 여권/탑승권/회원카드 등을 카테고리별로 정리하고, 만료일 알림을 주는 방식을 쓴다. 이번 버전은 이 중 카테고리 정리 + 이미지 보관만 채택하고, 만료일 알림은 다음 버전으로 미룬다.
+3. 레이아웃 — 카드형 그리드 갤러리
+• 상단: 카테고리 필터 칩 (전체 / 여권 / 항공권 / QR코드 / 숙소예약 / 기타) — 가계부의 카테고리 칩과 동일한 UI 패턴 재사용
+• 본문: 2열 카드 그리드로 이미지 썰네일을 배치 (사진/QR코드는 사진 그대로, PDF는 PDF 아이콘 + 파일명으로 표시)
+• 각 카드 하단에 제목(예: '여권', 'KE721 탑승권') 한 줄
+• 카드 탭하면 전체화면 뷰어로 확대 보기 (이미지는 핑처/주변 드래그로, PDF는 새 탭/보기 모드)
+• 우측 하단 또는 상단 고정 '+' 버튼으로 업로드
+4. 업로드 플로우
+1. '+' 버튼 → 모달: '사진에서 선택' / '직접 찍기' / 'PDF/파일 선택' 3개 옵션
+2. 사진/PDF 선택 후 미리보기 표시
+3. 카테고리 선택(칩), 제목 입력란, 설명(선택, 메모란)
+4. '저장' → Supabase Storage 업로드 + DB 기록
+5. 지원 파일 형식: PNG, JPG, PDF (개당 최대 10MB 제한)
+5. 저장소 결정 — Supabase Storage (사적, 서버측)
+• 이유: 여권/항공권은 여행 중 휴대폰 분실·고장 상황에서 다른 기기로 확인해야 하는 자료라, 로컬에만 있으면 위험함
+• 'wallet' 버킷을 private로 생성
+• RLS/Storage 정책: 본인(업로드한 사람)만 조회/삭제 가능 (여행 멤버에게도 공개 안 됨 — 일정/가계부와 달리 개인 문서라 비공개가 기본)
+6. 데이터 모델
+create table wallet_items (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid references auth.users(id) not null,
+  trip_id uuid references trips(id), -- 특정 여행과 연결(선택), 널이면 '공통 보관함'으로 처리
+  category text not null, -- passport|flight|qr|lodging|etc
+  title text not null,
+  description text,
+  file_url text not null,
+  file_type text not null, -- 'image' | 'pdf'
+  created_at timestamptz default now()
+);
+
+alter table wallet_items enable row level security;
+create policy "본인만 조회/수정" on wallet_items for all
+  using (user_id = auth.uid());
+Storage 버킷 정책은 이미지 허가 경로를 {user_id}/{filename} 형식으로 강제해서, 경로의 첫 번째 세그먼트가 auth.uid()와 일치할 때만 업로드/조회 허용.
+7. 오픈 이슈 (기본값으로 진행)
+• 카테고리: 여권 / 항공권 / QR코드 / 숙소예약 / 기타 5개로 확정
+• 만료일 알림은 이번 범위에서 제외 (다음 버전 후보)
+• 여행(trip_id) 연결은 선택사항으로 구현 (연결 안 해도 저장 가능, 여러 여행에 공통으로 쓰는 신분증 같은 문서 고려)
+• 파일 용량 제한(10MB)은 임시값, 실제 사용해보고 조정 가능

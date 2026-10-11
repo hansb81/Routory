@@ -1,0 +1,22 @@
+{
+  "name": "triplog-mobile",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Capacitor native wrapper (Android/iOS) for the triplog/ web app. Not deployed to Vercel.",
+  "dependencies": {
+    "@capacitor/android": "^8.5.2",
+    "@capacitor/app": "^8.1.1",
+    "@capacitor/browser": "^8.0.4",
+    "@capacitor/camera": "^8.2.4",
+    "@capacitor/core": "^8.5.2",
+    "@capacitor/ios": "^8.5.2",
+    "@capacitor/splash-screen": "^8.0.2"
+  },
+  "devDependencies": {
+    "@capacitor/assets": "^3.0.5",
+    "@capacitor/cli": "^8.5.2"
+  },
+  "allowScripts": {
+    "sharp@0.32.6": true
+  }
+}

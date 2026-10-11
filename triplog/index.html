@@ -1,0 +1,372 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <!-- viewport-fit=cover: 이게 없으면 env(safe-area-inset-*)가 늘 0으로 계산된다(노치 뒤까지 화면을 채우도록
+       허락해야 그 값이 의미를 가진다). 웹(일반 브라우저)에서는 효과가 없고 무시된다. -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+  <title>Routory</title>
+  <!-- 앱이 시작하자마자 쓰는 외부 서버에 미리 연결해 둔다 (라이브러리 CDN, Supabase). 지도·카카오는 필요할 때만 불러온다. -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="preconnect" href="https://ffzjgiknrrgwvgobybdq.supabase.co" crossorigin />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+  <!-- 일정 화면(.app-top, #timeline)은 처음에 숨겨 둔다: 로그인 여부를 확인한 뒤 라우터가 화면을 정해서 보여준다 -->
+  <!-- @별칭 SCHEDULE-TOP · 일정 화면 상단 묶음 -->
+  <div class="app-top" hidden data-alias="SCHEDULE-TOP · 일정 화면 상단 묶음">
+    <!-- @별칭 SCHEDULE-HEADER · 일정 헤더 (여행 제목 · 날짜 · D-day) -->
+    <header class="app-header" data-alias="SCHEDULE-HEADER · 일정 헤더 (여행 제목 · 날짜 · D-day)">
+      <div class="trip-title-group">
+        <h1 class="trip-title" id="trip-title">여행 제목</h1>
+        <p class="trip-dates" id="trip-dates"></p>
+      </div>
+      <span class="dday-badge" id="dday-badge">D-DAY</span>
+    </header>
+    <!-- @별칭 QUICK-MENU · 빠른 메뉴 (교통편 · 숙소) - 여행지갑·가계부는 SHELL의 하단 탭(MYTRIP-BOTTOMTABS)으로 옮겼다 -->
+    <nav class="quick-menu" aria-label="여행 메뉴" data-alias="QUICK-MENU · 빠른 메뉴 (교통편 · 숙소)">
+      <button type="button" class="quick-menu-btn quick-transport-trigger" data-menu="flight" aria-haspopup="listbox" aria-expanded="false">
+        <span>교통편</span>
+        <span class="quick-transport-trigger-caret" aria-hidden="true">▼</span>
+      </button>
+      <button type="button" class="quick-menu-btn" data-menu="lodging">숙소</button>
+    </nav>
+    <!-- @별칭 DAY-MAP · 일정 지도 -->
+    <section class="day-map" id="day-map" aria-label="일정 지도" data-open="true" data-alias="DAY-MAP · 일정 지도">
+      <div class="day-map-body" id="day-map-body">
+        <div class="day-map-inner">
+          <div class="day-map-canvas" id="day-map-canvas"></div>
+          <p class="day-map-status" id="day-map-status" role="status" hidden></p>
+        </div>
+      </div>
+      <button type="button" class="day-map-handle" id="day-map-toggle" aria-expanded="true" aria-controls="day-map-body" aria-label="지도 접기">
+        <span class="day-map-chevron" aria-hidden="true"></span>
+      </button>
+    </section>
+  </div>
+
+  <!-- @별칭 TIMELINE · Day별 일정 목록 -->
+  <main class="timeline" id="timeline" hidden data-alias="TIMELINE · Day별 일정 목록">
+    <!-- 일정 카드 목록이 이 영역에 렌더링됩니다 -->
+  </main>
+
+  <!-- SCHEDULE-FORM(일정 추가·수정 창)은 이제 전체화면 창이라 schedule.js가 직접 만들어 body에 붙인다
+       (expenseForm.js/walletForm.js와 같은 방식) - 별칭은 그 창의 overlay.dataset.alias로 붙는다. -->
+
+  <!-- @별칭 TRIP-SETUP · 여행 만들기·설정 마법사 -->
+  <div class="modal-overlay" id="trip-modal-overlay" hidden data-alias="TRIP-SETUP · 여행 만들기·설정 마법사">
+    <div class="modal wizard" role="dialog" aria-modal="true" aria-labelledby="trip-modal-title">
+      <div class="wizard-header">
+        <button type="button" class="wizard-back" id="trip-back" aria-label="이전 단계" hidden>←</button>
+        <div class="wizard-heading">
+          <p class="wizard-step-label" id="trip-step-label">1단계 · 여행지 입력</p>
+          <h2 class="modal-title" id="trip-modal-title">어디로 떠나시나요?</h2>
+        </div>
+        <button type="button" class="wizard-close" id="trip-btn-cancel" aria-label="닫기" hidden>✕</button>
+      </div>
+
+      <div class="wizard-body">
+        <section id="trip-step-1">
+          <input type="search" id="city-search" class="search-input" placeholder="여행지 검색 (예: 오사카, 방콕)" autocomplete="off" />
+          <div class="tab-row" id="region-tabs" role="tablist"></div>
+          <div class="tab-row tab-row--sub" id="group-tabs" role="tablist"></div>
+          <ul class="pick-list" id="city-list"></ul>
+        </section>
+
+        <section id="trip-step-2" hidden>
+          <div class="calendar" id="calendar"></div>
+          <p class="calendar-hint" id="calendar-hint">출발 날짜를 선택해주세요.</p>
+        </section>
+      </div>
+
+      <div class="wizard-footer" id="trip-footer" hidden>
+        <button type="button" class="btn btn-save btn-block" id="trip-confirm-btn"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- @별칭 FLIGHT · 항공편 추가 창 -->
+  <div class="modal-overlay" id="flight-modal-overlay" hidden data-alias="FLIGHT · 항공편 추가 창">
+    <div class="modal wizard" role="dialog" aria-modal="true" aria-labelledby="flight-modal-title">
+      <div class="wizard-header">
+        <button type="button" class="wizard-back" id="flight-back" aria-label="이전 단계" hidden>←</button>
+        <div class="wizard-heading">
+          <p class="wizard-step-label" id="flight-step-label"></p>
+          <h2 class="modal-title" id="flight-modal-title"></h2>
+        </div>
+        <button type="button" class="wizard-close" id="flight-btn-close" aria-label="닫기">✕</button>
+      </div>
+
+      <div class="wizard-body flight-form">
+        <!-- 새 항공편을 추가할 때만 보이는 화면: 항공권 사진으로 등록(위) / 직접 등록(아래) 중 고른다.
+             수정(편집)일 때는 이 화면을 건너뛰고 바로 날짜·항공사 단계로 들어간다 (flight.js#openForm). -->
+        <section id="flight-step-choice">
+          <!-- 항공권 사진으로 자동입력: 사진은 base64로 바꿔 분석(Edge Function → Google Gemini)에만 보내고, 어디에도 저장하지 않는다.
+               분석에 성공하면 필요한 화면만 거쳐 곧바로 "항공편 확인" 화면까지 자동으로 진행한다 (flight.js#applyScanAndAdvance). -->
+          <div class="flight-ticket-card">
+            <p class="flight-ticket-title">항공권 사진으로 등록</p>
+            <p class="flight-ticket-desc">항공권 사진을 고르면 항공사·편명은 물론 출발일까지 읽어서, 맞는 Day를 자동으로 찾아 등록해요. 분석을 위해 사진이 AI 서비스(Google Gemini)로 전송되며, 저장되지 않아요.</p>
+            <div class="flight-ticket-actions">
+              <button type="button" class="btn btn-cancel" id="flight-ticket-pick">사진에서 선택</button>
+              <button type="button" class="btn btn-cancel" id="flight-ticket-camera">직접 찍기</button>
+            </div>
+            <input type="file" id="flight-ticket-file" accept="image/*" hidden />
+            <input type="file" id="flight-ticket-camera-file" accept="image/*" capture="environment" hidden />
+            <div class="flight-ticket-preview" id="flight-ticket-preview" hidden>
+              <img id="flight-ticket-img" alt="선택한 항공권 사진 미리보기" />
+              <button type="button" class="flight-ticket-clear" id="flight-ticket-clear" aria-label="사진 지우기">✕</button>
+            </div>
+            <p class="flight-ticket-status" id="flight-ticket-status" role="status" hidden></p>
+          </div>
+
+          <div class="flight-choice-divider" role="separator" aria-hidden="true"><span>또는</span></div>
+
+          <button type="button" class="btn btn-cancel btn-block" id="flight-manual-btn">직접 등록할게요</button>
+        </section>
+
+        <section id="flight-step-day" hidden>
+          <div class="flight-chips flight-chips--days" id="flight-day-chips"></div>
+        </section>
+
+        <section id="flight-step-airline" hidden>
+          <p class="flight-autofill-notice" id="flight-autofill-notice-2" role="status" hidden></p>
+          <p class="flight-field-label">항공사</p>
+          <input type="search" id="flight-airline-search" class="search-input" placeholder="항공사 검색 (예: 대한항공, KE, jeju)" autocomplete="off" />
+          <div class="flight-chips" id="flight-airline-chips"></div>
+
+          <p class="flight-field-label flight-field-label--spaced">편명</p>
+          <div class="flight-no-row">
+            <span class="flight-no-prefix" id="flight-no-prefix">--</span>
+            <input type="text" id="flight-no-input" class="flight-input" maxlength="5" inputmode="numeric" placeholder="예: 723" autocomplete="off" aria-label="편명" />
+          </div>
+          <p class="flight-hint flight-hint--muted">항공권에 적힌 편명의 숫자 부분을 입력해주세요.</p>
+
+          <div class="flight-api-box">
+            <p class="flight-api-title">출발·도착 시간 자동 조회 <span id="flight-api-state"></span></p>
+            <div class="flight-api-row" id="flight-api-form">
+              <input type="password" id="flight-api-key" class="flight-input" placeholder="AviationStack 액세스 키" autocomplete="off" aria-label="AviationStack 액세스 키" />
+              <button type="button" class="btn btn-cancel" id="flight-api-save">저장</button>
+            </div>
+            <button type="button" class="flight-api-clear" id="flight-api-clear" hidden>연결 해제 (키 삭제)</button>
+            <p class="flight-api-help">
+              키를 저장하면 조회 시 시간까지 자동으로 채워져요. 키는 이 브라우저에만 저장됩니다.
+              <a href="https://aviationstack.com/" target="_blank" rel="noopener">AviationStack 키 받는 곳</a>
+            </p>
+          </div>
+        </section>
+
+        <section id="flight-step-confirm" hidden>
+          <p class="flight-autofill-notice" id="flight-autofill-notice-3" role="status" hidden></p>
+          <p class="flight-lookup-status" id="flight-lookup-status"></p>
+
+          <div class="fd-stop">
+            <span class="fd-role-col">출발</span>
+            <div class="fd-fields">
+              <input type="time" id="flight-dep-time" class="flight-input flight-time-big" aria-label="출발 시간" />
+              <select id="flight-dep-airport" class="flight-input" aria-label="출발 공항"></select>
+            </div>
+          </div>
+          <div class="fd-duration">
+            <span class="fd-role-col"></span>
+            <span class="flight-hint" id="flight-duration-hint"></span>
+          </div>
+          <div class="fd-stop">
+            <span class="fd-role-col">도착</span>
+            <div class="fd-fields">
+              <input type="time" id="flight-arr-time" class="flight-input flight-time-big" aria-label="도착 시간" />
+              <select id="flight-arr-airport" class="flight-input" aria-label="도착 공항"></select>
+            </div>
+          </div>
+
+          <p class="form-error" id="flight-error" hidden></p>
+        </section>
+      </div>
+
+      <div class="wizard-footer" id="flight-footer" hidden>
+        <button type="button" class="btn btn-save btn-block" id="flight-btn-next"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- @별칭 FLIGHT-DETAIL · 항공편 상세 창 -->
+  <div class="modal-overlay" id="flight-detail-overlay" hidden data-alias="FLIGHT-DETAIL · 항공편 상세 창">
+    <div class="modal flight-detail" role="dialog" aria-modal="true" aria-labelledby="flight-detail-title">
+      <p class="wizard-step-label" id="flight-detail-day"></p>
+      <h2 class="modal-title" id="flight-detail-title"></h2>
+      <div class="flight-detail-body" id="flight-detail-body"></div>
+      <div class="modal-actions">
+        <button type="button" class="btn btn-delete" id="flight-detail-delete">삭제</button>
+        <div class="modal-actions-right">
+          <button type="button" class="btn btn-cancel" id="flight-detail-edit">수정</button>
+          <button type="button" class="btn btn-save" id="flight-detail-close">닫기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- @별칭 INVITE-MODAL · 초대 링크 창 (링크 복사 · 카카오톡) -->
+  <div class="modal-overlay" id="invite-overlay" hidden data-alias="INVITE-MODAL · 초대 링크 창 (링크 복사 · 카카오톡)">
+    <div class="modal invite-modal" role="dialog" aria-modal="true" aria-labelledby="invite-title">
+      <h2 class="modal-title" id="invite-title">친구 초대하기</h2>
+      <p class="invite-status" id="invite-status" role="status">초대 링크를 만드는 중이에요...</p>
+      <div class="invite-link-box" id="invite-link-box" hidden>
+        <input type="text" class="search-input invite-link" id="invite-link" readonly aria-label="초대 링크" />
+        <button type="button" class="btn btn-save" id="invite-copy">링크 복사</button>
+      </div>
+      <button type="button" class="invite-kakao-btn" id="invite-kakao">💬 카카오톡으로 초대하기</button>
+      <div class="modal-actions">
+        <div class="modal-actions-right">
+          <button type="button" class="btn btn-cancel" id="invite-close">닫기</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- @별칭 UI-TOAST · 토스트(잠깐 뜨는 안내) -->
+  <div class="toast" id="toast" role="status" hidden data-alias="UI-TOAST · 토스트(잠깐 뜨는 안내)"></div>
+
+  <!-- @별칭 SCHEDULE-DELETE-CONFIRM · 일정 삭제 확인창 -->
+  <div class="modal-overlay" id="confirm-overlay" hidden data-alias="SCHEDULE-DELETE-CONFIRM · 일정 삭제 확인창">
+    <div class="modal modal-confirm" role="alertdialog" aria-modal="true">
+      <p>이 일정을 삭제할까요?</p>
+      <div class="modal-actions">
+        <div class="modal-actions-right">
+          <button type="button" class="btn btn-cancel" id="confirm-cancel">취소</button>
+          <button type="button" class="btn btn-danger" id="confirm-ok">삭제</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- @별칭 TRIP-IMPORT-MODAL · 여행 가져오기 창 (PRD v8) -->
+  <!-- MAIN(새 여행 만들기 옆)과 SCHEDULE(가져오기 버튼) 양쪽에서 tripImport.open({ mode, tripId })로 연다.
+       탭 3개(파일/텍스트/사진)는 서로 다른 방식으로 같은 자리(첨부 하나 + 텍스트)를 채우는 것뿐이라, 파일·사진
+       탭은 하나의 첨부 자리를 공유한다(analyze-trip-import가 imageBase64를 하나만 받으므로) - js/tripImport.js 참고. -->
+  <div class="modal-overlay" id="trip-import-overlay" hidden data-alias="TRIP-IMPORT-MODAL · 여행 가져오기 창">
+    <div class="modal wizard" role="dialog" aria-modal="true" aria-labelledby="trip-import-title">
+      <div class="wizard-header">
+        <div class="wizard-heading">
+          <h2 class="modal-title" id="trip-import-title">여행 가져오기</h2>
+        </div>
+        <button type="button" class="wizard-close" id="trip-import-close" aria-label="닫기">✕</button>
+      </div>
+
+      <div class="wizard-body">
+        <p class="trip-import-lead">여행 일정표, 예약확인서, 메모 등을 올리면 AI가 일정과 비용을 자동으로 찾아드려요.</p>
+
+        <div class="trip-import-tabs" role="tablist" aria-label="가져올 방식">
+          <button type="button" class="trip-import-tab" role="tab" id="trip-import-tab-file" data-tab="file" aria-selected="true" aria-controls="trip-import-panel-file">파일</button>
+          <button type="button" class="trip-import-tab" role="tab" id="trip-import-tab-text" data-tab="text" aria-selected="false" aria-controls="trip-import-panel-text">텍스트</button>
+          <button type="button" class="trip-import-tab" role="tab" id="trip-import-tab-photo" data-tab="photo" aria-selected="false" aria-controls="trip-import-panel-photo">사진</button>
+        </div>
+
+        <section class="trip-import-panel" id="trip-import-panel-file" role="tabpanel" aria-labelledby="trip-import-tab-file">
+          <p class="trip-import-desc">여행 일정표·예약확인서 PDF나 이미지 파일을 선택해주세요.</p>
+          <button type="button" class="btn btn-cancel btn-block" id="trip-import-file-pick">파일 선택</button>
+          <input type="file" id="trip-import-file-input" accept="application/pdf,image/*" hidden />
+          <div class="trip-import-file-preview" id="trip-import-file-preview" hidden>
+            <span class="trip-import-file-icon" aria-hidden="true">📄</span>
+            <span class="trip-import-file-name" id="trip-import-file-name"></span>
+            <button type="button" class="trip-import-clear" id="trip-import-file-clear" aria-label="선택한 파일 지우기">✕</button>
+          </div>
+        </section>
+
+        <section class="trip-import-panel" id="trip-import-panel-text" role="tabpanel" aria-labelledby="trip-import-tab-text" hidden>
+          <p class="trip-import-desc">여행 일정이 담긴 텍스트를 붙여넣어주세요.</p>
+          <textarea class="trip-import-textarea" id="trip-import-textarea" rows="8" maxlength="20000" placeholder="예) 9/1 인천 출발 → 제주 도착, 9/2 한라산 등반, 숙소 00호텔 2박, 항공권 45,000원..."></textarea>
+        </section>
+
+        <section class="trip-import-panel" id="trip-import-panel-photo" role="tabpanel" aria-labelledby="trip-import-tab-photo" hidden>
+          <p class="trip-import-desc">여행 관련 사진을 선택하거나 촬영해주세요.</p>
+          <div class="trip-import-photo-actions">
+            <button type="button" class="btn btn-cancel" id="trip-import-photo-pick">사진에서 선택</button>
+            <button type="button" class="btn btn-cancel" id="trip-import-photo-camera">직접 찍기</button>
+          </div>
+          <input type="file" id="trip-import-photo-file" accept="image/*" hidden />
+          <input type="file" id="trip-import-photo-camera-file" accept="image/*" capture="environment" hidden />
+          <div class="trip-import-photo-preview" id="trip-import-photo-preview" hidden>
+            <img id="trip-import-photo-img" alt="선택한 사진 미리보기" />
+            <button type="button" class="trip-import-clear" id="trip-import-photo-clear" aria-label="사진 지우기">✕</button>
+          </div>
+        </section>
+
+        <p class="trip-import-status" id="trip-import-status" role="status" hidden></p>
+        <p class="form-error" id="trip-import-error" hidden></p>
+      </div>
+
+      <div class="wizard-footer">
+        <button type="button" class="btn btn-save btn-block" id="trip-import-submit">분석하기</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- @별칭 TRIP-IMPORT-PREVIEW · 여행 가져오기 미리보기 창 (PRD v8) -->
+  <!-- analyze-trip-import의 결과를 tripImportPreview.js가 여기 채운다(카드 목록이라 정적 마크업은 뼈대뿐).
+       tripImport.js가 분석에 성공하면 onAnalyzed로 이 창의 open()을 부른다(js/tripImportPreview.js#init). -->
+  <div class="modal-overlay" id="trip-import-preview-overlay" hidden data-alias="TRIP-IMPORT-PREVIEW · 여행 가져오기 미리보기 창">
+    <div class="modal wizard" role="dialog" aria-modal="true" aria-labelledby="trip-import-preview-title">
+      <div class="wizard-header">
+        <div class="wizard-heading">
+          <h2 class="modal-title" id="trip-import-preview-title">가져올 내용 확인</h2>
+        </div>
+        <button type="button" class="wizard-close" id="trip-import-preview-close" aria-label="닫기">✕</button>
+      </div>
+
+      <div class="wizard-body" id="trip-import-preview-body"></div>
+
+      <div class="wizard-footer">
+        <p class="form-error" id="trip-import-preview-error" hidden></p>
+        <button type="button" class="btn btn-save btn-block" id="trip-import-preview-submit">등록하기</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/util.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/calendar.js"></script>
+  <script src="js/config.js"></script>
+  <script src="js/googleMaps.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/auth.js"></script>
+  <script src="js/permissionPrompt.js"></script>
+  <script src="js/aiNotice.js"></script>
+  <script src="js/tripImport.js"></script>
+  <script src="js/storage.js"></script>
+  <script src="js/images.js"></script>
+  <script src="js/schedule.js"></script>
+  <script src="js/dday.js"></script>
+  <script src="js/flightData.js"></script>
+  <script src="js/flight.js"></script>
+  <script src="js/destinations.js"></script>
+  <script src="js/tripSetup.js"></script>
+  <script src="js/invite.js"></script>
+  <script src="js/dayMap.js"></script>
+  <script src="js/router.js"></script>
+  <script src="js/commonPages.js"></script>
+  <script src="js/legalPages.js"></script>
+  <script src="js/lodgingData.js"></script>
+  <script src="js/lodging.js"></script>
+  <script src="js/mainPage.js"></script>
+  <script src="js/loginPage.js"></script>
+  <script src="js/consentPage.js"></script>
+  <script src="js/accountDeletePage.js"></script>
+  <script src="js/myTripData.js"></script>
+  <script src="js/tripMembers.js"></script>
+  <script src="js/myTripPage.js"></script>
+  <script src="js/tripShell.js"></script>
+  <script src="js/invitePage.js"></script>
+  <script src="js/currencyData.js"></script>
+  <script src="js/expenseCategoryData.js"></script>
+  <script src="js/walletCategoryData.js"></script>
+  <script src="js/expenseForm.js"></script>
+  <script src="js/budgetPage.js"></script>
+  <script src="js/walletForm.js"></script>
+  <script src="js/walletViewer.js"></script>
+  <script src="js/walletPage.js"></script>
+  <script src="js/tripImportPreview.js"></script>
+  <script src="js/tripExport.js"></script>
+  <script src="js/timelineDrag.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>
