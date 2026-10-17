@@ -1,6 +1,6 @@
 // @별칭 SHELL · 여행 공통 셸 (상단 아이콘 바 · 하단 탭바 · 우측 메뉴)
 // (전체 지도는 D:/VibeCoding/Study_01/comments.html)
-// 나의 여행(#/my-trip/:id) · 일정(#/schedule/:id) · 가계부(#/budget/:id) · 여행지갑(#/wallet) ·
+// 나의 여행(#/my-trip/:id) · 일정(#/schedule/:id) · 가계부(#/budget/:id) · 여행지갑(#/wallet/:id) ·
 // 숙소 추가(#/lodging/:id) 다섯 화면에서 화면이 바뀌어도 같은 DOM 하나가 그대로 남아 있는 공통 셸이다.
 // body에 한 번만 붙이고(모달과 같은 방식), 라우터가 화면을 바꿀 때마다 보이기/숨기기와 하단 탭 강조만 갱신한다.
 //
@@ -17,7 +17,7 @@
 //   MYTRIP-MENU      우측 슬라이드 메뉴: 패널 헤드 왼쪽 끝에 닫기(✕), 오른쪽 끝에 알림(🔔)·설정(⚙,
 //                    commonPages.js 공용 화면) 두 아이콘을 바짝 붙여 묶는다(.mytrip-panel-head-actions).
 //                    그 아래 프로필 줄(menuProfileHtml, main의 MAIN-MENU 프로필 줄과 같은 CSS) ·
-//                    여행 공유(owner, invite.js)·여행 가져오기(tripImport.js) + 더미 항목 +
+//                    여행 공유(owner, invite.js)·여행 가져오기(tripImport.js)·동행자 관리(tripMembers.js) +
 //                    여행 삭제(owner)/나가기(참여자). 로그아웃·알림 설정·여행 설정은 다른 위치로 옮길
 //                    예정이라 일단 뺐다(메뉴 텍스트 "메뉴" 자체도 뺐다).
 //
@@ -26,12 +26,13 @@
 (function () {
   const { getTrip, loadItems, getItems, deleteTrip, leaveTrip } = window.TripLog.storage;
   const { deleteImage } = window.TripLog.images;
-  const { showComingSoon, showToast, showAlert } = window.TripLog.ui;
+  const { showToast, showAlert } = window.TripLog.ui;
   const { escapeHtml } = window.TripLog.util;
   const router = window.TripLog.router;
   const auth = window.TripLog.auth;
   const invite = window.TripLog.invite;
   const tripImport = window.TripLog.tripImport;
+  const tripMembers = window.TripLog.tripMembers;
 
   const SHELL_ROUTES = ["my-trip", "schedule", "budget", "wallet", "lodging"]; // 이 화면들에서만 셸이 보인다
   const ALL_ROUTES = [
@@ -81,8 +82,6 @@
     { id: "wallet", label: "여행지갑", icon: ICONS.wallet, route: "wallet", activeOn: ["wallet"] },
     { id: "budget", label: "가계부", icon: ICONS.budget, route: "budget", activeOn: ["budget"] },
   ];
-
-  const MENU_ITEMS = ["동행자 관리"];
 
   let shellEl = null;
 
@@ -164,12 +163,14 @@
   // '여행 공유'(초대 링크, invite.js)와 '여행 가져오기'(tripImport.js)는 원래 일정 화면 헤더의 #invite-row에
   // 있었으나 여기로 옮겨왔다. 초대 링크 조회·생성은 RLS상 owner만 할 수 있어서 '여행 공유'는 owner에게만 보이고,
   // '여행 가져오기'는 역할과 무관하게 여행이 있으면 보인다(원래 #invite-row와 같은 규칙).
+  // '동행자 관리'는 tripMembers.js의 멤버 관리 창을 연다 - owner는 내보내기까지 할 수 있고, 초대받아 들어온
+  // 참여자는 내보내기 없이 함께 하는 멤버 목록만 본다(tripMembers.js#renderManage가 역할을 보고 가른다).
   function renderMenuList(trip) {
     const list = shellEl.querySelector("[data-menu-list]");
     list.innerHTML = `
       ${trip?.role === "owner" ? `<li><button type="button" data-action="invite">여행 공유</button></li>` : ""}
       ${trip ? `<li><button type="button" data-action="trip-import">여행 가져오기</button></li>` : ""}
-      ${MENU_ITEMS.map((label) => `<li><button type="button" data-action="menu-item" data-label="${label}">${label}</button></li>`).join("")}
+      ${trip ? `<li><button type="button" data-action="members">동행자 관리</button></li>` : ""}
       ${
         trip
           ? trip.role === "owner"
@@ -340,13 +341,15 @@
     }
     else if (action === "menu") setDrawer(true);
     else if (action === "drawer-close") setDrawer(false);
-    else if (action === "menu-item") showComingSoon(target.dataset.label);
     else if (action === "invite") {
       setDrawer(false);
       invite.open();
     } else if (action === "trip-import" && trip) {
       setDrawer(false);
       tripImport.open({ mode: "append", tripId: trip.id });
+    } else if (action === "members" && trip) {
+      setDrawer(false);
+      tripMembers.open(trip);
     } else if (action === "notifications") {
       setDrawer(false);
       router.navigate(router.buildPath("notifications"));

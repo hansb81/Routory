@@ -80,6 +80,20 @@
     return options;
   }
 
+  // PRD v12(여행지 확장) 이후: destinations/trips가 이미 확정해 둔 ISO 통화 코드로 바로 선택지를 만든다 -
+  // 나라 이름을 이 파일의 13개국 표와 맞춰보는 getCurrencyOptions와 달리, 그 표에 없는 통화(체코 CZK,
+  // 스위스 CHF 등)도 code만 맞으면 선택지에 들어간다. 표에 있으면(findByCode) 기호·한글 이름을 쓰고,
+  // 없으면 기호·이름 자리에 코드 자체를 보여준다(countryLabel은 formatOption의 "국가명" 자리에 쓸 값 -
+  // trip.destination 문자열의 나라 이름을 그대로 넘기면 된다). code가 없으면(통화를 모르는 나라) 원화·
+  // 달러 2개만 돌려준다.
+  function getCurrencyOptionsByCode(code, countryLabel) {
+    const options = [...FIXED_CURRENCIES];
+    if (!code) return options;
+    const destCurrency = findByCode(code) ?? { country: countryLabel ?? code, code, symbol: code, nameKo: code };
+    if (!options.some((c) => c.code === destCurrency.code)) options.push(destCurrency);
+    return options;
+  }
+
   // 환율표에 없는 통화면 null (호출한 쪽에서 "환산 안 됨"으로 처리해야 한다)
   function getRateToKrw(code) {
     return RATES_TO_KRW[code] ?? null;
@@ -105,6 +119,7 @@
     findByCode,
     findByCountry,
     getCurrencyOptions,
+    getCurrencyOptionsByCode,
     toKrw,
     formatOption,
   };

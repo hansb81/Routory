@@ -42,4 +42,8 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 13(API 33)부터는 이 선언이 있어야 PushNotifications.requestPermissions()가 실제로 알림
+         권한 팝업을 띄운다(targetSdk 36이라 해당). camera 권한과 달리 이건 선언을 빼도 우회할 방법이 없다 -
+         런타임 알림 자체가 이 권한 없이는 OS에 의해 막힌다. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
 </manifest>

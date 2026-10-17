@@ -1,21 +1,26 @@
-// @별칭 WALLET · 여행지갑 화면 (#/wallet)
+// @별칭 WALLET · 여행지갑 화면 (#/wallet/:id)
 // (전체 지도는 D:/VibeCoding/Study_01/comments.html)
 // PRD v7 "여행지갑 기능"의 메인 화면: 개인지갑 섹션 + 공유지갑 섹션을 위아래로 나란히 보여주는 2열 카드
-// 그리드. 특정 여행에 매이지 않는 개인 전체 문서함이라 다른 화면과 달리 :id가 없다 (SHELL의 하단 탭
-// "여행지갑"에서 들어온다, tripShell.js - 원래는 schedule 페이지의 QUICK-MENU 버튼이었다). 카테고리
-// 필터는 이 화면에는 없고 문서 등록 팝업(walletForm.js)의 카테고리 선택에만 있다.
+// 그리드. 019_wallet_trip_required.sql부터 여행별로 따로 쌓이므로 다른 셸 화면(일정/가계부 등)과 같은
+// :id가 있다 (SHELL의 하단 탭 "여행지갑"에서 들어온다, tripShell.js - 원래는 schedule 페이지의
+// QUICK-MENU 버튼이었다). 카테고리 필터는 이 화면에는 없고 문서 등록 팝업(walletForm.js)의 카테고리
+// 선택에만 있다.
 //
-// 개인지갑/공유지갑(007_wallet_shared.sql): 개인지갑은 나만 보이는 문서, 공유지갑은 업로드할 때 고른
-// 여행의 멤버에게도 보이는 문서(다른 멤버가 올린 공유 문서도 여기 나타난다)다. 두 섹션은 walletForm.js가
-// 업로드할 때 고르는 값을 그대로 나눠서 보여줄 뿐이다 — 문서 자체를 나중에 개인↔공유로 옮기는 기능은
-// 없다. 좌우 탭으로 전환하는 대신 한 화면 안에서 위(개인지갑)·아래(공유지갑) 순서로 늘 함께 보이므로,
-// 개인지갑에 문서가 많아질수록 공유지갑 섹션은 자연히 아래로 밀려난다.
+// 개인지갑/공유지갑(007_wallet_shared.sql): 개인지갑은 나만 보이는 문서, 공유지갑은 이 여행의 멤버에게도
+// 보이는 문서(다른 멤버가 올린 공유 문서도 여기 나타난다)다. 둘 다 이제 "지금 보는 이 여행"에만 쌓인다 -
+// 예전에는 개인지갑 문서가 여행과 무관한 공통 보관함이라 모든 여행에서 똑같이 보였는데, 사용자 피드백
+// ("여행별로 파일 따로 관리")에 따라 바꿨다: 개인지갑도 "나만 보이는" 것과 "이 여행 것"을 모두 만족해야
+// 보인다. 두 섹션은 walletForm.js가 업로드할 때 고르는 값을 그대로 나눠서 보여줄 뿐이다 — 문서 자체를
+// 나중에 개인↔공유로 옮기는 기능은 없다. 좌우 탭으로 전환하는 대신 한 화면 안에서 위(개인지갑)·아래
+// (공유지갑) 순서로 늘 함께 보이므로, 개인지갑에 문서가 많아질수록 공유지갑 섹션은 자연히 아래로 밀려난다.
 //
-// 목록은 storage.getWalletItems()로 채운다. 화면에 처음 들어올 때 storage.loadWalletItems()로 서버에서
-// 실제 목록을 받는다(RLS가 "내 것 + 내가 멤버인 여행에 공유된 것"만 돌려준다 — budgetPage.js가
-// loadExpenses/isExpensesLoaded를 쓰는 것과 같은 패턴: 처음 보면 "불러오는 중" 문구, 받아 온 적 있으면
-// 캐시로 먼저 그린 뒤 새로 고친다). "+" 버튼의 업로드(walletForm.js)가 성공하면 그 결과가 같은 캐시에
-// 바로 더해진다. 카드를 누르면 walletViewer.js의 전체화면 보기가 연다(제목/카테고리/설명, 확대·이동, 삭제).
+// 목록은 storage.getWalletItems()가 돌려주는 전체 캐시(여러 여행이 섞여 있을 수 있다)에서 trip.id로 거른
+// 것으로 채운다 - budgetPage.js가 getExpenses()를 trip.id로 거르는 것과 같은 방식. 화면에 처음 들어올 때
+// storage.loadWalletItems(trip.id)로 서버에서 이 여행 몫만 받는다(RLS가 "내 것 + 내가 멤버인 이 여행에
+// 공유된 것"만 돌려준다 — budgetPage.js가 loadExpenses/isExpensesLoaded를 쓰는 것과 같은 패턴: 처음 보면
+// "불러오는 중" 문구, 받아 온 적 있으면 캐시로 먼저 그린 뒤 새로 고친다). "+" 버튼의 업로드(walletForm.js)가
+// 성공하면 그 결과가 같은 캐시에 바로 더해진다. 카드를 누르면 walletViewer.js의 전체화면 보기가 연다
+// (제목/카테고리/설명, 확대·이동, 삭제).
 //
 // 이미지 미리보기는 Storage의 getPublicUrl이 아니라 storage.js#getWalletFileUrl(→ createSignedUrl)을
 // 쓴다 — 'wallet' 버킷이 private라서 공개 URL이 없고, 그때그때 짧게 유효한 서명된 URL을 새로 받아야
@@ -23,6 +28,7 @@
 
 (function () {
   const storage = window.TripLog.storage;
+  const { getTripById } = storage;
   const { escapeHtml } = window.TripLog.util;
   const { getCategoryByKey, WALLET_VISIBILITY, getVisibilityByKey } = window.TripLog.walletCategoryData;
   const router = window.TripLog.router;
@@ -97,11 +103,12 @@
     );
   }
 
-  function render(el, loading) {
+  function render(el, trip, loading) {
     hydrateId += 1;
-    const allItems = storage.getWalletItems();
+    el.dataset.tripId = trip.id;
+    const tripItems = storage.getWalletItems().filter((item) => item.tripId === trip.id);
     const itemsByVisibility = Object.fromEntries(
-      WALLET_VISIBILITY.map((v) => [v.key, allItems.filter((item) => item.visibility === v.key)])
+      WALLET_VISIBILITY.map((v) => [v.key, tripItems.filter((item) => item.visibility === v.key)])
     );
 
     el.innerHTML = `
@@ -136,23 +143,27 @@
   // 바로 고쳐 두므로 다시 불러올 필요 없이 render만 하면 된다 (budgetPage.js의 refreshVisible과 같은 방식).
   function refreshVisible() {
     const el = document.querySelector('[data-page="wallet"]');
-    if (el && !el.hidden) render(el, !storage.isWalletItemsLoaded());
+    if (!el || el.hidden) return;
+    const trip = getTripById(el.dataset.tripId);
+    if (trip) render(el, trip, !storage.isWalletItemsLoaded(trip.id));
   }
 
   // 처음 보면 "불러오는 중" 문구를 먼저 보여주고, 받아 둔 적 있으면 캐시로 먼저 그린 뒤 새로 고친다
   // (budgetPage.js#render와 같은 패턴).
-  async function enter(el) {
+  async function enter(el, { params }) {
+    const trip = getTripById(params.id);
+    if (!trip) return; // requireTrip 가드가 이미 걸러내므로 여기까지 오지 않는다
     const runId = ++loadRunId;
-    render(el, !storage.isWalletItemsLoaded());
+    render(el, trip, !storage.isWalletItemsLoaded(trip.id));
 
     try {
-      await storage.loadWalletItems();
+      await storage.loadWalletItems(trip.id);
     } catch (err) {
       if (runId === loadRunId) ui.showToast(err.message);
       return;
     }
-    if (runId !== loadRunId || el.hidden) return; // 그 사이에 떠났다
-    render(el, false);
+    if (runId !== loadRunId || el.dataset.tripId !== trip.id) return; // 그 사이에 떠났거나 다른 여행으로 옮겼다
+    render(el, trip, false);
   }
 
   window.TripLog.walletForm.init(refreshVisible);

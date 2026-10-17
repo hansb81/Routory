@@ -73,17 +73,22 @@
     return `${dotted(trip.startDate)} ~ ${dotted(end)} · ${nights}박 ${nights + 1}일`;
   }
 
-  // 아직 끝나지 않은 여행은 가까운 순으로 앞에, 지난 여행은 최근 순으로 뒤에 둔다
-  function sortTrips(trips) {
-    const isPast = (trip) => daysUntil(trip.endDate || trip.startDate) < 0;
-    const byStart = (a, b) => a.startDate.localeCompare(b.startDate);
-    const upcoming = trips.filter((t) => !isPast(t)).sort(byStart);
-    const past = trips.filter(isPast).sort((a, b) => byStart(b, a));
-    return [...upcoming, ...past];
+  // 일정이 끝난 여행 - "내 여행"에는 더 이상 보이지 않고, MAIN-MENU의 "지난 여행"에서만 보인다
+  const isPastTrip = (trip) => daysUntil(trip.endDate || trip.startDate) < 0;
+  const byStart = (a, b) => a.startDate.localeCompare(b.startDate);
+
+  // 아직 끝나지 않은 여행을 가까운 순으로
+  function sortUpcoming(trips) {
+    return trips.filter((t) => !isPastTrip(t)).sort(byStart);
+  }
+
+  // 지난 여행을 최근에 끝난 순으로
+  function sortPast(trips) {
+    return trips.filter(isPastTrip).sort((a, b) => byStart(b, a));
   }
 
   function tripCardHtml(trip) {
-    const past = daysUntil(trip.endDate || trip.startDate) < 0;
+    const past = isPastTrip(trip);
     const destination = trip.destination || trip.title || "여행지 미정";
     const title = trip.title && trip.title !== destination ? trip.title : "";
     return `
@@ -134,7 +139,8 @@
   }
 
   // 화면에 걸린 카드마다 멤버를 받아 아바타 자리를 채운다. 못 받으면(RLS 등) 그 카드는 그냥 비워 둔다.
-  function hydrateCardAvatars(trips) {
+  // root는 카드가 그려진 화면(main 또는 past-trips의 el) - 두 화면이 이 함수를 함께 쓴다.
+  function hydrateCardAvatars(trips, root) {
     const run = ++avatarRun;
     trips.forEach(async (trip) => {
       let members = memberCache.get(trip.id);
@@ -146,8 +152,8 @@
           return; // 못 받으면 제목만 보인다
         }
       }
-      if (run !== avatarRun || !pageEl || pageEl.hidden) return; // 그 사이에 화면을 떠났거나 다시 그렸다
-      const slot = pageEl.querySelector(`[data-avatars="${CSS.escape(trip.id)}"]`);
+      if (run !== avatarRun || !root || root.hidden) return; // 그 사이에 화면을 떠났거나 다시 그렸다
+      const slot = root.querySelector(`[data-avatars="${CSS.escape(trip.id)}"]`);
       if (slot && members.length) slot.innerHTML = avatarsHtml(members);
     });
   }
@@ -168,7 +174,7 @@
 
   function render(el) {
     pageEl = el;
-    const trips = sortTrips(getAllTrips());
+    const trips = sortUpcoming(getAllTrips());
 
     // 서버에서 목록을 받기 전에는 "여행이 없다"고 보여주지 않는다
     const tripsHtml = trips.length
@@ -202,7 +208,17 @@
           }
         </div>
         ${tripsHtml}
-      </section>`;
+      </section>
+
+      ${trips.length ? window.TripLog.travelFeed.mainSectionHtml() + window.TripLog.travelFeed.discoverSectionHtml() : ""}`;
+    // 요청 1번: 여행이 하나도 없으면 "새 여행 만들기" 안내만 보여주고 그 아래(여행 소식·어디로 떠나볼까요)는
+    // 아예 안 그려서 빈 상태 안내가 화면을 채운다 - 여행이 없는 사람에게 "내 여행지/내 항공편" 매칭이나
+    // "미리 선택된 여행 만들기"나 애초에 의미가 같이 없다.
+
+    if (trips.length) {
+      window.TripLog.travelFeed.initMainSection(el.querySelector(".main-feed"));
+      window.TripLog.travelFeed.initDiscoverSection(el.querySelector(".main-popular"));
+    }
 
     if (!el.dataset.bound) {
       el.dataset.bound = "1";
@@ -215,7 +231,7 @@
       el.addEventListener("pointerdown", handleCardPointerDown);
     }
 
-    if (trips.length) hydrateCardAvatars(trips);
+    if (trips.length) hydrateCardAvatars(trips, el);
   }
 
   // ---- 새 여행 만들기 (2단계 마법사) ----
@@ -225,9 +241,9 @@
     tripSetup.open({
       trip: null,
       canClose: true,
-      onComplete: async ({ cityId, cityName, destination, startDate, endDate }) => {
+      onComplete: async ({ cityId, cityName, destination, destinationId, timezone, lat, lng, currency, startDate, endDate }) => {
         try {
-          await createTrip({ title: `${cityName} 여행`, destination, cityId, startDate, endDate });
+          await createTrip({ title: `${cityName} 여행`, destination, cityId, destinationId, timezone, lat, lng, currency, startDate, endDate });
         } catch (err) {
           ui.showToast(err.message);
           return;
@@ -285,6 +301,7 @@
         ${menuProfileHtml()}
         <ul class="mytrip-menu">
           <li><button type="button" data-action="import-trip">여행 가져오기</button></li>
+          <li><button type="button" data-action="past-trips">지난 여행</button></li>
         </ul>
       </aside>`;
     document.body.appendChild(menuEl);
@@ -295,6 +312,9 @@
       else if (e.target.closest('[data-action="import-trip"]')) {
         setMenu(false);
         tripImport.open({ mode: "create" }); // tripId 없음 - 분석 결과로 새 여행을 만든다
+      } else if (e.target.closest('[data-action="past-trips"]')) {
+        setMenu(false);
+        router.navigate(router.buildPath("past-trips"));
       } else if (e.target.closest('[data-action="notifications"]')) {
         setMenu(false);
         router.navigate(router.buildPath("notifications"));
@@ -516,6 +536,41 @@
     ui.showToast(isOwner ? `'${name}' 여행을 삭제했어요.` : `'${name}' 여행에서 나갔어요.`);
   }
 
+  // ---- 지난 여행 (MAIN-MENU "지난 여행", #/past-trips) ----
+  // 일정이 끝난 여행만 모아 보여주는 목록 화면이다. 알림·설정과 같은 "SHELL 없는 보통 .page" 화면이라
+  // commonPages.js의 .simple-page-header/-title/-empty를 그대로 쓰고, 배경도 그 화면들과 같은
+  // body.has-simple-page-bg(--surface-blue, #d6e4fb)를 그대로 재사용한다(새 배경 클래스를 만들지 않는다).
+  // 카드 모양은 "내 여행"의 tripCardHtml을 그대로 쓰지만, 스와이프 삭제는 여기서는 묶지 않는다(지난
+  // 여행을 지우는 길은 아직 없다 - 필요해지면 그때 추가).
+
+  let pastPageEl = null;
+
+  function renderPastTrips(el) {
+    pastPageEl = el;
+    const { ICONS } = window.TripLog.commonPages;
+    const trips = sortPast(getAllTrips());
+    el.innerHTML = `
+      <header class="simple-page-header">
+        <button type="button" class="mytrip-icon-btn mytrip-icon-btn--dark" data-action="back" aria-label="뒤로">${ICONS.back}</button>
+        <h1 class="simple-page-title">지난 여행</h1>
+      </header>
+      ${trips.length ? `<div class="trip-cards">${trips.map(tripCardHtml).join("")}</div>` : `<p class="simple-page-empty">지난 여행이 없습니다.</p>`}`;
+
+    if (!el.dataset.bound) {
+      el.dataset.bound = "1";
+      el.addEventListener("click", (e) => {
+        if (e.target.closest('[data-action="back"]')) history.back();
+      });
+      removeBrokenAvatars(el);
+    }
+
+    if (trips.length) hydrateCardAvatars(trips, el);
+  }
+
+  router.definePage("past-trips", renderPastTrips);
+  router.onEnter("past-trips", () => document.body.classList.add("has-simple-page-bg"));
+  router.onLeave("past-trips", () => document.body.classList.remove("has-simple-page-bg"));
+
   // ---- 내 여행 목록 불러오기 ----
 
   // 서버에서 내가 속한(초대받은 것 포함) 여행을 받아 온다. 받으면 storage.onChange가 화면을 다시 그리게 한다.
@@ -529,9 +584,10 @@
     }
   }
 
-  // 여행 목록 캐시가 바뀌면(서버에서 새로 받음, 로그아웃) 메인 화면을 보고 있을 때 다시 그린다
+  // 여행 목록 캐시가 바뀌면(서버에서 새로 받음, 로그아웃) 메인/지난 여행 화면을 보고 있을 때 다시 그린다
   storage.onChange(() => {
     if (pageEl && !pageEl.hidden) render(pageEl);
+    if (pastPageEl && !pastPageEl.hidden) renderPastTrips(pastPageEl);
   });
 
   // 파스텔 블루 배경(지금은 메인 화면만 - 다른 화면은 각자 작업할 때 차례로 적용한다): body에 클래스를

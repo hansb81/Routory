@@ -11,14 +11,20 @@
 
 (function () {
   const storage = window.TripLog.storage;
-  const { getTripById, loadExpenses, getExpenses, isExpensesLoaded, deleteExpense } = storage;
+  const { getTripById, loadExpenses, getExpenses, isExpensesLoaded, deleteExpense, loadMembers } = storage;
   const { escapeHtml, getTripDays } = window.TripLog.util;
   const { getCategoryByKey } = window.TripLog.expenseCategoryData;
   const { findByCode } = window.TripLog.currencyData;
   const ui = window.TripLog.ui;
   const router = window.TripLog.router;
+  const auth = window.TripLog.auth;
 
   let loadRunId = 0;
+
+  // budget-header 우측 아이콘 두 개. 총 지출(카테고리별 분포)은 pie 모양, 1/n(정산)은 아이콘 대신 글자 그대로
+  // 쓴다 - "결제자 n명이 나눠 낸다"는 뜻을 아이콘화하기보다 숫자식 표기가 더 바로 읽힌다.
+  const ICON_CATEGORY_PIE =
+    '<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 3v9l7.5 4.33"/><path d="M12 3a9 9 0 11-9 9"/></svg>';
 
   // "여행준비" + Day1~DayN. 여행 기간이 없으면(여행 정보를 못 찾은 경우) "여행준비"만 남는다.
   function buildSections(trip) {
@@ -218,6 +224,206 @@
     }
   }
 
+  // ---- 총 지출 내역 (budget-header 우측 아이콘): 카테고리별 금액·비율을 막대로 보여준다 ----
+
+  let totalOverlay = null;
+
+  function ensureTotalOverlay() {
+    if (totalOverlay) return;
+    totalOverlay = document.createElement("div");
+    totalOverlay.className = "modal-overlay";
+    totalOverlay.dataset.alias = "BUDGET-TOTAL · 총 지출 내역 창";
+    totalOverlay.hidden = true;
+    totalOverlay.innerHTML = `
+      <div class="modal budget-total-modal" role="dialog" aria-modal="true" aria-labelledby="budget-total-title">
+        <h2 class="modal-title" id="budget-total-title">총 지출</h2>
+        <p class="budget-total-modal-amount" data-total-amount></p>
+        <h3 class="budget-total-modal-subtitle">카테고리별</h3>
+        <ul class="budget-category-list" data-category-list></ul>
+        <div class="modal-actions">
+          <div class="modal-actions-right">
+            <button type="button" class="btn btn-save" data-action="total-close">닫기</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(totalOverlay);
+
+    totalOverlay.addEventListener("click", (e) => {
+      if (e.target.closest('[data-action="total-close"]')) closeTotalOverlay();
+    });
+    totalOverlay.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeTotalOverlay();
+    });
+  }
+
+  function categoryBreakdownHtml(expenses) {
+    const total = totalKrw(expenses);
+    const sums = new Map();
+    for (const expense of expenses) {
+      const amount = typeof expense.krwAmount === "number" ? expense.krwAmount : 0;
+      sums.set(expense.category, (sums.get(expense.category) ?? 0) + amount);
+    }
+    if (!sums.size) return `<p class="budget-empty">아직 기록된 비용이 없어요.</p>`;
+
+    return [...sums.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([key, amount]) => {
+        const meta = getCategoryByKey(key);
+        const percent = total > 0 ? Math.round((amount / total) * 100) : 0;
+        return `
+          <li class="budget-category-row">
+            <div class="budget-category-row-head">
+              <span class="budget-category-icon" aria-hidden="true">${meta?.icon ?? "📌"}</span>
+              <span class="budget-category-label">${escapeHtml(meta?.label ?? key)}</span>
+              <span class="budget-category-amount">${escapeHtml(formatTotal(amount))}</span>
+              <span class="budget-category-percent">${percent}%</span>
+            </div>
+            <div class="budget-category-bar"><div class="budget-category-bar-fill" style="width:${percent}%"></div></div>
+          </li>`;
+      })
+      .join("");
+  }
+
+  function openTotalOverlay(trip) {
+    ensureTotalOverlay();
+    const expenses = getExpenses().filter((expense) => expense.tripId === trip.id);
+    totalOverlay.querySelector("[data-total-amount]").textContent = formatTotal(totalKrw(expenses));
+    totalOverlay.querySelector("[data-category-list]").innerHTML = categoryBreakdownHtml(expenses);
+    totalOverlay.hidden = false;
+  }
+
+  function closeTotalOverlay() {
+    if (totalOverlay) totalOverlay.hidden = true;
+  }
+
+  // ---- 1/n 정산 내역 (budget-header 우측 아이콘): 각 지출의 결제자/더치페이로 멤버별 정산액을 계산한다 ----
+  // 멤버별 정산액 = (그 멤버가 결제자로 들어간 지출의 금액/결제자 수 합) - (그 멤버가 더치페이로 들어간 지출의
+  // 금액/더치페이 인원 수 합). 양수면 받을 돈, 음수면 보낼 돈이다. 여행 멤버가 아니라 비용 폼에서 "+추가"로
+  // 넣은 인원(expenseForm.js)은 이름이 서버에 남지 않아 "이름 없는 멤버"로 보인다(tripMembers.js와 같은 처리).
+
+  let splitOverlay = null;
+  let splitRunId = 0;
+
+  function ensureSplitOverlay() {
+    if (splitOverlay) return;
+    splitOverlay = document.createElement("div");
+    splitOverlay.className = "modal-overlay";
+    splitOverlay.dataset.alias = "BUDGET-SPLIT · 정산 내역 창";
+    splitOverlay.hidden = true;
+    splitOverlay.innerHTML = `
+      <div class="modal budget-split-modal" role="dialog" aria-modal="true" aria-labelledby="budget-split-title">
+        <h2 class="modal-title" id="budget-split-title">정산 내역</h2>
+        <p class="budget-split-total-label">총 지출</p>
+        <p class="budget-split-total-amount" data-split-total></p>
+        <p class="budget-split-note" data-split-note hidden></p>
+        <ul class="budget-split-list" data-split-list></ul>
+        <div class="modal-actions">
+          <div class="modal-actions-right">
+            <button type="button" class="btn btn-save" data-action="split-close">닫기</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(splitOverlay);
+
+    splitOverlay.addEventListener("click", (e) => {
+      if (e.target.closest('[data-action="split-close"]')) closeSplitOverlay();
+    });
+    splitOverlay.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeSplitOverlay();
+    });
+  }
+
+  // 로그인 정보의 내 이름을 섞어 쓴다(get_trip_members 함수가 없어 이름을 못 받은 경우에도 내 이름은 보이게) -
+  // tripMembers.js#withSelf/expenseForm.js#withSelf와 같은 방식.
+  function withSelf(members) {
+    const myId = auth.getUserId();
+    const profile = auth.getProfile();
+    return members.map((m) => (m.userId === myId && profile ? { ...m, name: m.name || profile.name } : m));
+  }
+
+  function computeBalances(expenses, members) {
+    const balance = new Map();
+    const add = (userId, delta) => balance.set(userId, (balance.get(userId) ?? 0) + delta);
+
+    for (const expense of expenses) {
+      const amount = typeof expense.krwAmount === "number" ? expense.krwAmount : 0;
+      if (!amount) continue;
+      const payers = expense.payerIds ?? [];
+      const splits = expense.splitIds ?? [];
+      if (payers.length) {
+        const share = amount / payers.length;
+        payers.forEach((id) => add(id, share));
+      }
+      if (splits.length) {
+        const share = amount / splits.length;
+        splits.forEach((id) => add(id, -share));
+      }
+    }
+
+    const nameById = new Map(members.map((m) => [m.userId, m.name || "이름 없는 멤버"]));
+    return [...balance.entries()]
+      .map(([userId, amount]) => ({ userId, name: nameById.get(userId) ?? "이름 없는 멤버", amount }))
+      .sort((a, b) => b.amount - a.amount);
+  }
+
+  function formatSigned(krw) {
+    const rounded = Math.round(krw);
+    if (!rounded) return "₩0";
+    const abs = Math.abs(rounded).toLocaleString("ko-KR");
+    return rounded > 0 ? `+ ₩${abs}` : `- ₩${abs}`;
+  }
+
+  function splitRowHtml(row) {
+    const rounded = Math.round(row.amount);
+    const statusClass = rounded > 0 ? "budget-split-amount--receive" : rounded < 0 ? "budget-split-amount--send" : "budget-split-amount--even";
+    const statusLabel = rounded > 0 ? "받을 돈" : rounded < 0 ? "보낼 돈" : "정산 완료";
+    return `
+      <li class="budget-split-row">
+        <span class="budget-split-name">${escapeHtml(row.name)}</span>
+        <span class="budget-split-amount-wrap">
+          <span class="budget-split-amount ${statusClass}">${formatSigned(rounded)}</span>
+          <span class="budget-split-status">${statusLabel}</span>
+        </span>
+      </li>`;
+  }
+
+  async function openSplitOverlay(trip) {
+    ensureSplitOverlay();
+    const runId = ++splitRunId;
+    const list = splitOverlay.querySelector("[data-split-list]");
+    const note = splitOverlay.querySelector("[data-split-note]");
+    const expenses = getExpenses().filter((expense) => expense.tripId === trip.id);
+
+    splitOverlay.querySelector("[data-split-total]").textContent = formatTotal(totalKrw(expenses));
+    splitOverlay.hidden = false;
+    list.innerHTML = "";
+    note.textContent = "멤버를 불러오는 중이에요...";
+    note.hidden = false;
+
+    let members;
+    try {
+      members = withSelf(await loadMembers(trip.id));
+    } catch (err) {
+      if (runId !== splitRunId) return;
+      note.textContent = err.message;
+      return;
+    }
+    if (runId !== splitRunId) return;
+
+    const balances = computeBalances(expenses, members);
+    if (!balances.length) {
+      note.textContent = "결제자·더치페이가 기록된 비용이 없어요.";
+      return;
+    }
+    note.hidden = true;
+    list.innerHTML = balances.map(splitRowHtml).join("");
+  }
+
+  function closeSplitOverlay() {
+    splitRunId += 1;
+    if (splitOverlay) splitOverlay.hidden = true;
+  }
+
   // "+ 비용 추가"를 누르면(또는 기존 지출 카드를 눌러 수정하면) expenseForm.js의 창을 연다.
   // 저장되면 refreshVisible이 화면을 다시 그린다 (expenseForm.js#init에 넘겨 둔다).
   function openAddExpense(trip, dayKey) {
@@ -247,6 +453,10 @@
             <h1 class="budget-title">가계부</h1>
             <p class="budget-subtitle">${escapeHtml(trip.title || trip.destination || "")}</p>
           </div>
+          <div class="budget-header-actions">
+            <button type="button" class="mytrip-icon-btn mytrip-icon-btn--dark" data-action="show-total" aria-label="총 지출 내역">${ICON_CATEGORY_PIE}</button>
+            <button type="button" class="mytrip-icon-btn mytrip-icon-btn--dark" data-action="show-split" aria-label="정산 내역"><span class="budget-icon-text" aria-hidden="true">1/n</span></button>
+          </div>
         </header>
         <div class="budget-scroll" data-budget-list></div>
         <div class="budget-total-bar">
@@ -270,6 +480,18 @@
           const trip = getTripById(el.dataset.tripId);
           const expense = getExpenses().find((exp) => exp.id === item.dataset.id);
           if (trip && expense) window.TripLog.expenseForm.open({ trip, expense });
+          return;
+        }
+        const totalBtn = e.target.closest('[data-action="show-total"]');
+        if (totalBtn) {
+          const trip = getTripById(el.dataset.tripId);
+          if (trip) openTotalOverlay(trip);
+          return;
+        }
+        const splitBtn = e.target.closest('[data-action="show-split"]');
+        if (splitBtn) {
+          const trip = getTripById(el.dataset.tripId);
+          if (trip) openSplitOverlay(trip);
         }
       });
     }
@@ -288,4 +510,8 @@
 
   window.TripLog.expenseForm.init(refreshVisible);
   router.definePage("budget", render);
+  router.onLeave("budget", () => {
+    closeTotalOverlay();
+    closeSplitOverlay();
+  });
 })();

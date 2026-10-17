@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "581467552493",
+    "project_id": "routory-b52b6",
+    "storage_bucket": "routory-b52b6.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:581467552493:android:b04e252684b5637341aae4",
+        "android_client_info": {
+          "package_name": "com.teamsdb.routory"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCur-xGXsWL2r3mt31T0H4D2ROdJdPkpDk"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

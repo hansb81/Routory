@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="robots" content="noindex, nofollow" />
+  <title>Routory</title>
+  <!-- 이 페이지는 SPA(index.html)의 해시 라우터 밖에 있는 독립 정적 페이지다(naver-callback.html/
+       account-deletion.html과 같은 자리) — 일반 사용자에게는 어디에도 링크를 노출하지 않고, 접근 제어는
+       로그인 + is_admin() RPC로 한다(020_admins.sql/021_travel_feed.sql). 로그인해 있지 않거나 관리자가
+       아니면 "페이지를 찾을 수 없어요"만 보여주고 그 이상 아무것도 드러내지 않는다 — 진짜 접근 차단은
+       화면 숨김이 아니라 서버의 RLS(모든 테이블 insert/update/delete가 is_admin() 통과를 요구)가 맡는다.
+       css/style.css는 그대로 불러와서 기존 토큰·클래스(.wizard*, .pick-list, .search-input, .btn* 등)를
+       재사용한다 — account-deletion.html과 달리 관리자만 쓰는 내부 도구라 새 디자인을 안 만들어도 된다. -->
+  <link rel="preconnect" href="https://cdn.jsdelivr.net" crossorigin />
+  <link rel="preconnect" href="https://ffzjgiknrrgwvgobybdq.supabase.co" crossorigin />
+  <link rel="stylesheet" href="css/style.css" />
+</head>
+<body class="admin-page">
+  <p id="admin-gate-loading" class="admin-gate">불러오는 중...</p>
+
+  <div id="admin-notfound" class="admin-notfound" hidden>
+    <h1>페이지를 찾을 수 없어요</h1>
+    <p>요청하신 주소가 존재하지 않습니다.</p>
+    <a href="/">홈으로 돌아가기</a>
+  </div>
+
+  <div id="admin-app" hidden>
+    <header class="admin-header">
+      <h1>Routory 관리</h1>
+      <span class="admin-header-user" id="admin-user-email"></span>
+    </header>
+
+    <nav class="tab-row" id="admin-main-tabs">
+      <button type="button" class="tab tab--active" data-main-tab="feed">여행 소식</button>
+      <button type="button" class="tab" data-main-tab="ranking">인기 여행지</button>
+      <button type="button" class="tab" data-main-tab="cities">추천 도시</button>
+    </nav>
+
+    <!-- ================= 여행 소식 ================= -->
+    <section id="admin-section-feed" class="admin-section">
+      <div class="tab-row tab-row--sub" id="feed-status-tabs">
+        <button type="button" class="tab tab--active" data-status="draft">승인 대기</button>
+        <button type="button" class="tab" data-status="published">게시 중</button>
+        <button type="button" class="tab" data-status="archived">보관</button>
+      </div>
+
+      <button type="button" class="btn btn-save btn-block" id="feed-new-btn">+ 새 소식 등록</button>
+
+      <form id="feed-form" class="admin-form" hidden novalidate>
+        <h2 id="feed-form-title">새 소식 등록</h2>
+
+        <div class="admin-form-grid">
+          <div class="form-field">
+            <label for="feed-kind">구분</label>
+            <select id="feed-kind">
+              <option value="safety">안전</option>
+              <option value="benefit">혜택</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="feed-scope">범위</label>
+            <select id="feed-scope">
+              <option value="overseas">해외</option>
+              <option value="domestic">국내</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="feed-country">국가코드 (선택)</label>
+            <select id="feed-country">
+              <option value="">선택 안 함</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="feed-region-label">지역 표기</label>
+            <input type="text" id="feed-region-label" placeholder="예: 일본 전체" />
+          </div>
+          <div class="form-field">
+            <label for="feed-airline">항공사 코드 (선택)</label>
+            <input type="text" id="feed-airline" placeholder="예: KE" maxlength="3" />
+          </div>
+          <div class="form-field">
+            <label for="feed-importance">중요도</label>
+            <select id="feed-importance">
+              <option value="high">높음</option>
+              <option value="medium" selected>보통</option>
+              <option value="low">낮음</option>
+            </select>
+          </div>
+          <div class="form-field">
+            <label for="feed-published-at">게시일</label>
+            <input type="date" id="feed-published-at" />
+          </div>
+          <div class="form-field" id="feed-valid-from-field" hidden>
+            <label for="feed-valid-from">적용 시작일</label>
+            <input type="date" id="feed-valid-from" />
+          </div>
+          <div class="form-field" id="feed-valid-to-field" hidden>
+            <label for="feed-valid-to">적용 종료일</label>
+            <input type="date" id="feed-valid-to" />
+          </div>
+        </div>
+
+        <div class="form-field">
+          <label for="feed-title">제목</label>
+          <input type="text" id="feed-title" />
+        </div>
+
+        <div class="form-field">
+          <label for="feed-summary">요약 <span class="admin-char-count" id="feed-summary-count">0/200</span></label>
+          <p class="admin-hint">원문을 그대로 붙여넣지 말고 우리 문장으로 요약하세요.</p>
+          <textarea id="feed-summary"></textarea>
+          <p class="form-error" id="feed-summary-warning" hidden>요약이 300자를 넘었어요. 더 짧게 줄여보세요.</p>
+        </div>
+
+        <div class="form-field">
+          <label for="feed-action-tip">행동 안내 (선택)</label>
+          <input type="text" id="feed-action-tip" placeholder="예: 입국 전 비자 발급 필요" />
+        </div>
+
+        <div class="form-field">
+          <label for="feed-source-name">출처 이름</label>
+          <input type="text" id="feed-source-name" placeholder="예: 외교부 해외안전여행" />
+        </div>
+        <div class="form-field">
+          <label for="feed-source-url">출처 URL (https만 허용)</label>
+          <input type="text" id="feed-source-url" placeholder="https://..." />
+        </div>
+
+        <p class="form-error" id="feed-form-error" hidden></p>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-cancel" id="feed-form-cancel">취소</button>
+          <button type="submit" class="btn btn-save" id="feed-form-submit">저장</button>
+        </div>
+      </form>
+
+      <ul class="pick-list" id="feed-list"></ul>
+      <p class="admin-empty" id="feed-empty" hidden>표시할 소식이 없어요.</p>
+    </section>
+
+    <!-- ================= 인기 여행지 ================= -->
+    <section id="admin-section-ranking" class="admin-section" hidden>
+      <div class="admin-form-grid">
+        <div class="form-field">
+          <label for="ranking-scope">범위</label>
+          <select id="ranking-scope">
+            <option value="overseas">해외</option>
+            <option value="domestic">국내</option>
+          </select>
+        </div>
+        <div class="form-field">
+          <label for="ranking-period">기준월</label>
+          <input type="month" id="ranking-period" />
+        </div>
+      </div>
+      <button type="button" class="btn btn-cancel btn-block" id="ranking-load-btn">불러오기</button>
+
+      <div class="admin-form-grid">
+        <div class="form-field">
+          <label for="ranking-source-name">출처 이름</label>
+          <input type="text" id="ranking-source-name" placeholder="예: 한국관광 데이터랩" />
+        </div>
+        <div class="form-field">
+          <label for="ranking-source-url">출처 URL (https만 허용)</label>
+          <input type="text" id="ranking-source-url" placeholder="https://..." />
+        </div>
+      </div>
+
+      <ol class="admin-ranking-list" id="ranking-rows"></ol>
+
+      <p class="form-error" id="ranking-form-error" hidden></p>
+
+      <div class="modal-actions">
+        <button type="button" class="btn btn-cancel" id="ranking-save-draft-btn">임시 저장</button>
+        <button type="button" class="btn btn-save" id="ranking-publish-btn">게시</button>
+      </div>
+    </section>
+
+    <!-- ================= 추천 도시 (discover_cities 전체 관리) ================= -->
+    <section id="admin-section-cities" class="admin-section" hidden>
+
+      <!-- ---- 목록 화면 ---- -->
+      <div id="city-list-view">
+        <div class="admin-cities-toolbar">
+          <label class="admin-check"><input type="checkbox" id="city-filter-not-this-month" /> 이번 달 추천 안 됨</label>
+          <label class="admin-check"><input type="checkbox" id="city-filter-no-image" /> 이미지 없음</label>
+          <button type="button" class="btn btn-cancel" id="city-preview-open-btn">미리보기</button>
+          <button type="button" class="btn btn-cancel" id="city-quick-review-open-btn">빠른 검수</button>
+          <button type="button" class="btn btn-save" id="city-add-open-btn">+ 도시 추가</button>
+        </div>
+
+        <ul class="pick-list" id="city-list"></ul>
+        <p class="admin-empty" id="city-list-empty" hidden>표시할 도시가 없어요.</p>
+      </div>
+
+      <!-- ---- 도시 추가 (요청 2번: PRD v12 도시 검색 → destinations 확정 → discover_cities 연결) ---- -->
+      <div id="city-add-panel" class="admin-form" hidden>
+        <h2>도시 추가</h2>
+        <div class="form-field">
+          <label for="city-add-search">도시명 검색</label>
+          <input type="text" id="city-add-search" class="search-input" placeholder="예: 다낭" autocomplete="off" />
+        </div>
+        <ul class="pick-list" id="city-add-results"></ul>
+        <p class="admin-empty" id="city-add-results-empty" hidden>검색 결과가 없어요.</p>
+        <p class="form-error" id="city-add-error" hidden></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-cancel" id="city-add-cancel">취소</button>
+        </div>
+      </div>
+
+      <!-- ---- 미리보기 (요청 6번: get_discover_cities를 이번 달 기준으로 그대로 호출) ---- -->
+      <div id="city-preview-panel" hidden>
+        <h2>미리보기 <span class="admin-hint-inline">— get_discover_cities(20), 이번 달 기준</span></h2>
+        <ul class="admin-preview-list" id="city-preview-list"></ul>
+        <p class="admin-empty" id="city-preview-empty" hidden>지금 추천되는 도시가 없어요.</p>
+        <p class="form-error" id="city-preview-error" hidden></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-cancel" id="city-preview-close-btn">닫기</button>
+        </div>
+      </div>
+
+      <!-- ---- 빠른 검수: 이미지 없는 도시를 한 화면에 쭉 나열해서 후보만 바로 비교·게시 ---- -->
+      <div id="city-quick-review-panel" hidden>
+        <h2>빠른 검수 <span class="admin-hint-inline">— 대표 이미지가 없는 도시만, 한 화면에서 바로 게시</span></h2>
+        <p class="admin-hint">
+          도시 풍경이 아니거나 사람 얼굴이 중심이거나 워터마크가 있는 사진은 그냥 건너뛰세요. 게시하면 그
+          도시는 이 목록에서 바로 사라집니다.
+        </p>
+        <div id="city-quick-review-list"></div>
+        <p class="admin-empty" id="city-quick-review-empty" hidden>대표 이미지가 없는 도시가 더 이상 없어요.</p>
+        <p class="form-error" id="city-quick-review-error" hidden></p>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-cancel" id="city-quick-review-close-btn">닫기</button>
+        </div>
+      </div>
+
+      <!-- ---- 도시 상세 (기본 정보 + 월별 점수 + 이미지 + 하이라이트, 전부 섹션으로 나뉨) ---- -->
+      <div id="city-detail" hidden>
+        <button type="button" class="btn btn-cancel" id="city-detail-back-btn">← 목록으로</button>
+        <h2 id="city-detail-title"></h2>
+
+        <!-- 기본 정보 -->
+        <section class="admin-city-section">
+          <div class="admin-form-grid">
+            <div class="form-field">
+              <label for="city-detail-tagline">한 줄 소개</label>
+              <input type="text" id="city-detail-tagline" />
+            </div>
+            <div class="form-field">
+              <label class="admin-check"><input type="checkbox" id="city-detail-active" /> 활성 (메인 화면 추천 후보에 포함)</label>
+            </div>
+          </div>
+          <div class="modal-actions">
+            <button type="button" class="btn btn-save" id="city-detail-save-basic-btn">기본 정보 저장</button>
+            <button type="button" class="btn btn-delete" id="city-detail-remove-btn">이 도시 제거</button>
+          </div>
+          <p class="form-error" id="city-basic-error" hidden></p>
+        </section>
+
+        <!-- 월별 점수 (요청 3번) -->
+        <section class="admin-city-section">
+          <h3 class="admin-city-section-title">월별 점수</h3>
+          <p class="admin-hint" id="city-month-preview"></p>
+          <div class="admin-month-grid" id="city-month-grid"></div>
+          <button type="button" class="btn btn-save btn-block" id="city-month-save-btn">월별 점수 저장</button>
+          <p class="form-error" id="city-month-error" hidden></p>
+        </section>
+
+        <!-- 이미지 (요청 4번) -->
+        <section class="admin-city-section">
+          <h3 class="admin-city-section-title">이미지</h3>
+          <div class="admin-city-preview-row">
+            <div>
+              <p class="admin-hint">대표 이미지 (실제 카드에 보일 모습)</p>
+              <div id="city-image-card-preview"></div>
+            </div>
+            <div>
+              <p class="admin-hint">대표 이미지가 없을 때 대체 카드</p>
+              <div id="city-image-fallback-preview"></div>
+            </div>
+          </div>
+
+          <p class="admin-hint">후보 비교 (draft/published 전부 — 가로로 비교해서 고르세요)</p>
+          <ul class="admin-city-image-grid" id="city-image-candidates"></ul>
+          <p class="admin-empty" id="city-image-candidates-empty" hidden>
+            수집된 후보가 없어요 — 아래에서 Wikimedia를 검색하거나 scripts/collect-city-images/collect.mjs로
+            모으거나 직접 올려보세요.
+          </p>
+
+          <h4 class="admin-city-subsection-title">Wikimedia Commons에서 검색</h4>
+          <p class="admin-hint">
+            검색 결과를 그대로 후보(draft)로 추가합니다 — 파일을 내려받지 않고 Wikimedia가 제공하는 주소를
+            그대로 씁니다(요청: 다운로드 없이 URL로). 허용 라이선스(CC0/퍼블릭 도메인/CC BY(-SA))와 저작자
+            표기가 있는 결과만 보여줍니다.
+          </p>
+          <div class="admin-cities-toolbar">
+            <input type="text" id="city-wiki-search" class="search-input" placeholder="예: Tokyo cityscape" />
+            <button type="button" class="btn btn-cancel" id="city-wiki-search-btn">검색</button>
+          </div>
+          <ul class="admin-city-image-grid" id="city-wiki-results"></ul>
+          <p class="admin-empty" id="city-wiki-results-empty" hidden>검색 결과가 없어요.</p>
+          <p class="form-error" id="city-wiki-error" hidden></p>
+
+          <h4 class="admin-city-subsection-title">Pexels에서 검색</h4>
+          <p class="admin-hint">
+            Wikimedia에 원하는 사진이 없을 때 대체로 씁니다. 역시 다운로드 없이 Pexels가 제공하는 주소를
+            그대로 사용합니다.
+          </p>
+          <div class="admin-cities-toolbar">
+            <input type="text" id="city-pexels-search" class="search-input" placeholder="예: Tokyo cityscape" />
+            <button type="button" class="btn btn-cancel" id="city-pexels-search-btn">검색</button>
+          </div>
+          <ul class="admin-city-image-grid" id="city-pexels-results"></ul>
+          <p class="admin-empty" id="city-pexels-results-empty" hidden>검색 결과가 없어요.</p>
+          <p class="form-error" id="city-pexels-error" hidden></p>
+
+          <h4 class="admin-city-subsection-title">Unsplash에서 검색</h4>
+          <p class="admin-hint">
+            역시 다운로드 없이 Unsplash가 제공하는 주소를 그대로 사용합니다. "후보로 추가"를 누르는 순간
+            Unsplash 쪽에 사용 사실을 1회 기록합니다(Unsplash API 이용약관이 요구하는 다운로드 트래킹).
+          </p>
+          <div class="admin-cities-toolbar">
+            <input type="text" id="city-unsplash-search" class="search-input" placeholder="예: Tokyo cityscape" />
+            <button type="button" class="btn btn-cancel" id="city-unsplash-search-btn">검색</button>
+          </div>
+          <ul class="admin-city-image-grid" id="city-unsplash-results"></ul>
+          <p class="admin-empty" id="city-unsplash-results-empty" hidden>검색 결과가 없어요.</p>
+          <p class="form-error" id="city-unsplash-error" hidden></p>
+
+          <h4 class="admin-city-subsection-title">직접 업로드</h4>
+          <p class="admin-hint">
+            권장: 가로 800px 안팎의 가벼운 이미지. 저작자·라이선스·출처는 필수예요 — 하나라도 비우면 저장되지 않아요.
+          </p>
+          <div id="city-image-upload-form" class="admin-form-grid">
+            <div class="form-field">
+              <label for="city-image-upload-file">이미지 파일</label>
+              <input type="file" id="city-image-upload-file" accept="image/*" />
+            </div>
+            <div class="form-field">
+              <label for="city-image-upload-credit">저작자</label>
+              <input type="text" id="city-image-upload-credit" />
+            </div>
+            <div class="form-field">
+              <label for="city-image-upload-license">라이선스</label>
+              <input type="text" id="city-image-upload-license" placeholder="예: CC BY-SA 4.0" />
+            </div>
+            <div class="form-field">
+              <label for="city-image-upload-source-name">출처 이름</label>
+              <input type="text" id="city-image-upload-source-name" placeholder="예: Wikimedia Commons" />
+            </div>
+            <div class="form-field">
+              <label for="city-image-upload-source-url">원본 URL (https만 허용)</label>
+              <input type="text" id="city-image-upload-source-url" placeholder="https://..." />
+            </div>
+            <div class="form-field">
+              <label for="city-image-upload-credit-url">저작자 프로필 URL (선택)</label>
+              <input type="text" id="city-image-upload-credit-url" placeholder="https://..." />
+            </div>
+          </div>
+          <button type="button" class="btn btn-save btn-block" id="city-image-upload-btn">업로드</button>
+          <p class="form-error" id="city-image-upload-error" hidden></p>
+        </section>
+
+        <!-- 하이라이트 (요청 5번) -->
+        <section class="admin-city-section">
+          <h3 class="admin-city-section-title">대표 관광지</h3>
+          <ul class="admin-highlight-list" id="city-highlight-list"></ul>
+          <p class="admin-empty" id="city-highlight-empty" hidden>등록된 관광지가 없어요.</p>
+
+          <div id="city-highlight-form" class="admin-form-grid">
+            <div class="form-field">
+              <label for="city-highlight-name">이름</label>
+              <input type="text" id="city-highlight-name" />
+            </div>
+            <div class="form-field">
+              <label for="city-highlight-summary">소개 (한두 줄)</label>
+              <input type="text" id="city-highlight-summary" />
+            </div>
+          </div>
+          <button type="button" class="btn btn-save btn-block" id="city-highlight-add-btn">+ 관광지 추가</button>
+          <p class="form-error" id="city-highlight-error" hidden></p>
+        </section>
+      </div>
+    </section>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="js/supabaseClient.js"></script>
+  <script src="js/adminPage.js"></script>
+</body>
+</html>

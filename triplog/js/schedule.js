@@ -101,6 +101,10 @@
         window.TripLog.flight.openDetail(item.id);
         return;
       }
+      if (item.transport) {
+        window.TripLog.transportForm.openForm(item);
+        return;
+      }
       // 숙소는 체크인 날짜가 곧 Day라서 날짜를 바꾸지 못하게 잠근다
       openForm(item, { hideDate: Boolean(item.lodging) });
     });

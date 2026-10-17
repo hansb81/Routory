@@ -1,6 +1,6 @@
 // @별칭 WALLET-FORM · 문서 업로드 창
 // (전체 지도는 D:/VibeCoding/Study_01/comments.html)
-// 여행지갑(#/wallet)의 "+" 버튼이 여는 업로드 폼. PRD v7 4번 흐름을 구현한다:
+// 여행지갑(#/wallet/:id)의 "+" 버튼이 여는 업로드 폼. PRD v7 4번 흐름을 구현한다:
 //   1) 개인지갑 / 공유지갑 중 하나를 고른다 (기본값 개인지갑; 공유지갑은 지금 보던 여행의 멤버에게 공개된다)
 //   2) 사진에서 선택 / 직접 찍기 / PDF·파일 선택 중 하나로 파일을 고른다
 //   3) 미리보기 (사진은 그대로, PDF는 파일명만)
@@ -9,10 +9,11 @@
 // walletPage.js가 "+"를 누르면 open()을 부른다. 저장에 성공하면 init()에 넘긴 콜백(walletPage.js의
 // 그리드 새로고침)을 부른다. expenseForm.js와 같은 모양의 모듈이다(ensureModal 한 번, open/close, 검증).
 //
-// 공유지갑은 "이 문서를 어느 여행의 멤버와 공유할지"가 있어야 하므로, storage.getTrip()이 돌려주는
-// "지금 보던 여행"(여행지갑은 늘 일정 화면의 QUICK-MENU에서 들어오므로 그 여행이 남아 있다 — walletPage.js의
-// 뒤로가기와 같은 전제)에 공유한다. 그 여행이 없으면(예: 주소창에 #/wallet을 직접 쳐서 들어온 경우) 공유지갑
-// 탭 자체를 목록에서 뺀다 — 공유할 여행이 없는데 고를 수 있게 두면 저장할 때가 되어서야 오류로 막게 된다.
+// 019_wallet_trip_required.sql부터 개인지갑/공유지갑 둘 다 "지금 보던 여행"(storage.getTrip(), 여행지갑은
+// 이제 늘 그 여행의 #/wallet/:id로 들어오므로 항상 남아 있다)에 저장한다 — 개인지갑도 더 이상 여행과
+// 무관한 공통 보관함이 아니라 그 여행에만 쌓인다. 그 여행이 없으면(이론상 주소창에 #/wallet을 id 없이
+// 직접 쳐서 들어온 경우 정도인데, 라우터가 :id를 요구하게 되어 있어 실제로는 거의 안 일어난다) 저장 시점에
+// 막는다(handleSubmit).
 
 (function () {
   const storage = window.TripLog.storage;
@@ -172,7 +173,8 @@
 
   // ---- 저장 위치: 개인지갑/공유지갑 (동그란 라디오 버튼, 기본은 개인지갑에 포커스) ----
   // 공유지갑은 지금 보던 여행의 멤버와 공유되므로, 그 여행이 없으면(storage.getTrip() null) 고를 대상이
-  // 없어 목록 자체에서 뺀다 — 개인지갑은 항상 고를 수 있다.
+  // 없어 목록 자체에서 뺀다 — 개인지갑도 이제 그 여행에 저장되지만(위 파일 머리 설명), 멤버 공개 여부와는
+  // 무관해서 여행이 없어도 고를 수 있다(실제로는 라우터가 :id를 요구해 이 경우가 거의 없다).
 
   function renderVisibilityTabs() {
     const trip = storage.getTrip();
@@ -258,8 +260,8 @@
     if (!state.categoryKey) return showError("카테고리를 선택해주세요.");
     if (!title) return showError("제목을 입력해주세요.");
 
-    const tripId = state.visibility === "shared" ? storage.getTrip()?.id ?? null : null;
-    if (state.visibility === "shared" && !tripId) return showError("공유지갑은 여행 화면에서 열어야 선택할 수 있어요.");
+    const tripId = storage.getTrip()?.id ?? null;
+    if (!tripId) return showError("문서를 올릴 여행을 찾을 수 없어요. 여행 화면에서 다시 열어주세요.");
 
     clearError();
     state.saving = true;

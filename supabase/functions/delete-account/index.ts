@@ -30,7 +30,13 @@
 //      5번의 trip_id cascade로 이미 다 지워져 있다 — 그래도 혹시 남은 게 있으면 마저 지운다(멱등 — 없는
 //      행을 지워도 오류가 아니다).
 //   7. user_consents (user_id = 나) — 약관 동의 기록.
-//   8. auth.admin.deleteUser(나) — Auth 계정 자체를 지운다. 위 1~7번을 이미 다 지웠으므로 이 시점엔
+//   8~11. device_tokens/notification_settings/notifications/notification_log (전부 user_id = 나) —
+//      PRD v11 푸시 알림 관련 네 테이블(031_push_notifications.sql). 넷 다 이미 auth.users에 on delete
+//      cascade로 걸려 있어서(031이 직접 그렇게 선언했다) 12번(deleteUser)만으로도 결국 다 지워지지만,
+//      1~7번과 같은 이유로 명시적으로도 지운다 — 이 함수는 "cascade가 있으니 생략"하지 않고 지울 수 있는
+//      건 전부 직접 지우는 방침이고(44번째 줄 주석 참고), 그래야 011이 나중에 어떤 이유로든 바뀌거나
+//      빠져도 이 함수 자체는 그대로 안전하다.
+//   12. auth.admin.deleteUser(나) — Auth 계정 자체를 지운다. 위 1~11번을 이미 다 지웠으므로 이 시점엔
 //      외래키 제약에 걸릴 행이 없어야 정상이다.
 //
 // 이 함수는 각 단계를 순서대로, 하나의 DB 트랜잭션으로 묶지 않고 수행한다(Admin API 호출과 여러 테이블에
@@ -43,9 +49,11 @@
 //
 // 011_delete_account_cascades.sql이 trips.owner_id/schedule_items.created_by/expenses.created_by/
 // trip_invites.created_by의 on delete 규칙을 cascade로 바꿔 둔 것은 이 함수의 설명과 모순되지 않는
-// 안전망이다 — 이 함수가 위 1~7번을 명시적으로 먼저 지우므로 8번 시점엔 이미 아무것도 안 걸리지만, 혹시
-// 어떤 단계가 코드 변경으로 빠지거나 경쟁 상태로 그 사이 새 행이 생겨도 8번(deleteUser) 자체가 외래키
-// 오류 없이 끝나도록 보장해 준다.
+// 안전망이다 — 이 함수가 위 1~11번을 명시적으로 먼저 지우므로 12번 시점엔 이미 아무것도 안 걸리지만, 혹시
+// 어떤 단계가 코드 변경으로 빠지거나 경쟁 상태로 그 사이 새 행이 생겨도 12번(deleteUser) 자체가 외래키
+// 오류 없이 끝나도록 보장해 준다. device_tokens/notification_settings/notifications/notification_log
+// 네 테이블은 011이 아니라 031_push_notifications.sql이 처음부터 cascade로 선언했다(뒤늦게 추가된
+// 안전망이 아니라 설계 시점부터 cascade였다는 차이가 있을 뿐, 이 함수 입장에서의 의미는 같다).
 //
 // 필요한 비밀값: 없음. SUPABASE_URL/SUPABASE_SERVICE_ROLE_KEY는 Supabase가 모든 Edge Function에 자동으로
 // 넣어준다(대시보드 → Edge Functions → Secrets에 이미 있다). service_role 키는 이 파일 밖으로 나가지 않는다.
@@ -146,7 +154,11 @@ Deno.serve(async (req: Request): Promise<Response> => {
     await step("소유한 여행 삭제", () => admin.from("trips").delete().eq("owner_id", userId)); // 5. trips(owner인 것만)
     await step("초대 기록 삭제", () => admin.from("trip_invites").delete().eq("created_by", userId)); // 6. trip_invites(본인이 만든)
     await step("약관 동의 기록 삭제", () => admin.from("user_consents").delete().eq("user_id", userId)); // 7. user_consents
-    await step("계정 삭제", () => admin.auth.admin.deleteUser(userId)); // 8. Auth 계정 자체
+    await step("기기 푸시 토큰 삭제", () => admin.from("device_tokens").delete().eq("user_id", userId)); // 8. device_tokens
+    await step("알림 설정 삭제", () => admin.from("notification_settings").delete().eq("user_id", userId)); // 9. notification_settings
+    await step("알림 기록 삭제", () => admin.from("notifications").delete().eq("user_id", userId)); // 10. notifications
+    await step("알림 발송 로그 삭제", () => admin.from("notification_log").delete().eq("user_id", userId)); // 11. notification_log
+    await step("계정 삭제", () => admin.auth.admin.deleteUser(userId)); // 12. Auth 계정 자체
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[delete-account] 탈퇴 처리 실패", userId, message);

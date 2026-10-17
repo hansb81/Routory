@@ -14,6 +14,7 @@
   const { getImageUrl } = window.TripLog.images;
   const { escapeHtml, shortDate, getTripDays, haversineKm } = window.TripLog.util;
   const flight = window.TripLog.flight;
+  const transportForm = window.TripLog.transportForm;
   const dayMap = window.TripLog.dayMap;
   const router = window.TripLog.router;
   const auth = window.TripLog.auth;
@@ -41,7 +42,13 @@
     // 순서, timelineDrag.js#persistReorder가 저장) 순으로 둔다. 숙소(체크인)는 그날의 맨 아래에 둔다.
     const sortKey = (item) =>
       `${item.date ?? ""} ${
-        item.flight ? `0${item.flight.depTime}` : item.lodging ? "2" : `1${String(item.sortOrder ?? 0).padStart(8, "0")}`
+        item.flight
+          ? `0${item.flight.depTime}`
+          : item.transport
+          ? `0${item.transport.depTime}`
+          : item.lodging
+          ? "2"
+          : `1${String(item.sortOrder ?? 0).padStart(8, "0")}`
       }`;
     const items = [...getVisibleItems()].sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
 
@@ -134,7 +141,7 @@
   }
 
   function itemDistanceKm(a, b) {
-    if (a.flight || b.flight) return null; // 항공편은 공항 좌표가 없어서 거리도 알 수 없다 (dayMap.js와 같은 규칙)
+    if (a.flight || b.flight || a.transport || b.transport) return null; // 항공편·기타 교통편은 좌표가 없어서 거리도 알 수 없다 (dayMap.js와 같은 규칙)
     if (typeof a.lat !== "number" || typeof a.lng !== "number") return null;
     if (typeof b.lat !== "number" || typeof b.lng !== "number") return null;
     return haversineKm({ lat: a.lat, lng: a.lng }, { lat: b.lat, lng: b.lng });
@@ -156,9 +163,13 @@
   function renderItemCard(item) {
     // 제목 필드가 없으므로 장소를 대표 텍스트로 쓰고, 장소가 없으면 메모를 대표 텍스트로 쓴다
     // (예전에 저장된 일정은 title이 있을 수 있어 그 값도 대체값으로 인정)
-    const primary = item.flight ? flight.summary(item) : item.place || item.title || item.memo || "";
-    const memo = !item.flight && item.memo && item.memo !== primary ? item.memo : "";
-    const icon = item.flight ? "✈️" : item.lodging ? "🏨" : item.place ? "📍" : "📝";
+    const primary = item.flight
+      ? flight.summary(item)
+      : item.transport
+      ? transportForm.summary(item)
+      : item.place || item.title || item.memo || "";
+    const memo = !item.flight && !item.transport && item.memo && item.memo !== primary ? item.memo : "";
+    const icon = item.flight ? "✈️" : item.transport ? transportForm.iconFor(item) : item.lodging ? "🏨" : item.place ? "📍" : "📝";
     const stay = item.lodging;
     const metaLine = stay
       ? [
@@ -175,12 +186,13 @@
             .map((id) => `<img class="item-thumb" data-image-id="${id}" alt="" />`)
             .join("")}</div>`
         : "";
-    // 항공편은 시간이 이미 요약문(primary)에 들어 있어서 따로 보여주지 않는다.
-    const timeLabel = !item.flight && item.time ? item.time.slice(0, 5) : "";
+    // 항공편·기타 교통편은 시간이 이미 요약문(primary)에 들어 있어서 따로 보여주지 않는다.
+    const timeLabel = !item.flight && !item.transport && item.time ? item.time.slice(0, 5) : "";
     // 드래그 핸들로 순서 바꾸기·가로로 스와이프해서 삭제하기(timelineDrag.js)는 일반 카드(장소·메모)에서만
-    // 된다. 항공편은 출발시간순, 숙소는 항상 맨 아래라는 자체 규칙이 있어서 자유롭게 순서를 바꾸면 안 되고,
-    // 둘 다 이미 각자의 삭제 방법(항공편 상세 화면, 숙소는 수정 폼의 삭제 버튼)이 있다.
-    const isPlain = !item.flight && !item.lodging;
+    // 된다. 항공편·기타 교통편은 출발시간순, 숙소는 항상 맨 아래라는 자체 규칙이 있어서 자유롭게 순서를
+    // 바꾸면 안 되고, 셋 다 이미 각자의 수정/삭제 방법(항공편 상세 화면, 기타 교통편은 그 등록 창의 삭제
+    // 버튼, 숙소는 수정 폼의 삭제 버튼)이 있다.
+    const isPlain = !item.flight && !item.transport && !item.lodging;
     // 오른쪽 끝 드래그 핸들(3줄 아이콘): 누르는 즉시 순서 바꾸기가 시작된다(길게 누르기 없음).
     // tripShell.js의 메뉴(≡) 아이콘과 같은 모양·그리기 방식을 그대로 쓴다.
     const dragHandle = isPlain
@@ -239,10 +251,11 @@
   // ---- 상단 메뉴 (교통편·숙소. 가계부·여행지갑은 SHELL의 하단 탭으로 옮겨갔다, tripShell.js 참고 - 숙소는
   // 한 번 그리로 옮겼다가 다시 여기로 돌아왔다) ----
 
-  // 교통편 드롭다운: "교통편" 버튼 아래로 항공/기차/버스/선박 목록이 펼쳐진다(가운데 팝업이 아니다).
-  // .app-top은 sticky라서 그 안에 넣으면 새 stacking context에 갇혀 아래 타임라인 위로 못 떠오를 수 있다 -
-  // 그래서 이 목록은 body에 따로 붙이고 position: fixed로 버튼의 실제 화면 위치(getBoundingClientRect)에 맞춰 놓는다.
-  const TRANSPORT_LABELS = { train: "기차", bus: "버스", ship: "선박" };
+  // 교통편 드롭다운: "교통편" 버튼 아래로 항공/기타 목록이 펼쳐진다(가운데 팝업이 아니다). 기차·버스·선박은
+  // 더 이상 여기 각자의 항목이 아니다 - "기타"를 고르면 transportForm.js가 여는 창 안의 카테고리 칩으로
+  // 들어갔다(사진 인식 과정 없이 전부 직접 입력). .app-top은 sticky라서 그 안에 넣으면 새 stacking
+  // context에 갇혀 아래 타임라인 위로 못 떠오를 수 있다 - 그래서 이 목록은 body에 따로 붙이고
+  // position: fixed로 버튼의 실제 화면 위치(getBoundingClientRect)에 맞춰 놓는다.
   let transportMenuEl = null;
 
   function ensureTransportMenu() {
@@ -254,9 +267,7 @@
     transportMenuEl.setAttribute("aria-label", "교통편 선택");
     transportMenuEl.innerHTML = `
       <li class="quick-transport-option" role="option" data-transport="flight">✈️ 항공</li>
-      <li class="quick-transport-option" role="option" data-transport="train">🚆 기차</li>
-      <li class="quick-transport-option" role="option" data-transport="bus">🚌 버스</li>
-      <li class="quick-transport-option" role="option" data-transport="ship">🚢 선박</li>`;
+      <li class="quick-transport-option" role="option" data-transport="etc">📌 기타</li>`;
     document.body.appendChild(transportMenuEl);
 
     transportMenuEl.addEventListener("click", (e) => {
@@ -264,7 +275,7 @@
       if (!option) return;
       closeTransportMenu();
       if (option.dataset.transport === "flight") flight.openForm();
-      else ui.showComingSoon(TRANSPORT_LABELS[option.dataset.transport]);
+      else transportForm.openForm();
     });
     // 바깥을 누르거나(트리거 버튼 자신은 toggle이 처리하므로 제외), 스크롤되거나, Esc를 누르면 닫는다
     document.addEventListener("click", (e) => {
@@ -328,6 +339,8 @@
     // consent(약관 동의 화면) 자신도 로그인은 필요하다 - auth.uid()로 user_consents에 저장하는 화면이라서.
     const CONSENT_GATED = [
       "main",
+      "travel-feed",
+      "discover-city",
       "my-trip",
       "schedule",
       "invite",
@@ -379,6 +392,7 @@
     router.beforeEnter("my-trip", requireTrip);
     router.beforeEnter("schedule", requireTrip);
     router.beforeEnter("budget", requireTrip);
+    router.beforeEnter("wallet", requireTrip);
     router.beforeEnter("lodging", requireTrip);
 
     // 일정 화면에 들어올 때마다 선택된 여행의 데이터로 다시 그린다
@@ -403,6 +417,10 @@
       // router.start()의 첫 render()에서부터 위 requireConsent 가드가 올바른 값을 보도록, 화면을 띄우기
       // 전에 미리 확인해 둔다(실패해도 던지지 않으므로 try/catch가 필요 없다 - storage.js의 refreshConsent 참고).
       if (auth.isLoggedIn()) await storage.refreshConsent();
+      // 네이티브 앱이고 이미 로그인돼 있으면: OS 알림 권한이 이전에 허용된 상태인지 확인해서, 허용돼
+      // 있으면 register()를 다시 불러 토큰을 갱신한다(기기 재설치, FCM 토큰 로테이션 등으로 전에 저장해 둔
+      // 값이 낡았을 수 있어서 - 요청 6번). 화면을 띄우는 것과 무관한 백그라운드 작업이라 기다리지 않는다.
+      if (auth.isLoggedIn() && auth.isNativeApp()) window.TripLog.pushNotifications?.refreshIfAlreadyGranted();
       router.start();
     });
   }
@@ -483,6 +501,7 @@
   dayMap.init();
   initSchedule(renderTimeline);
   flight.init(renderTimeline);
+  transportForm.init(renderTimeline);
   initQuickMenu();
   initDday();
   initTripSettings();

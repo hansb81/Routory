@@ -132,6 +132,17 @@
     return { city: parts[0] || "여행지", country: parts[parts.length - 1] || "" };
   }
 
+  // 국내 여행 여부 - 환율 카드(환전 필요 없음)와 날씨 카드 밑 시차 정보(시차 없음)에 공통으로 쓴다.
+  // destinationId가 있으면(새 체계로 확정된 해외 여행) 국내일 수 없다. 그 외엔 cityId로 destinations.js의
+  // region을 보고(국내 도시는 region: "domestic"), cityId가 없으면(옛 방식으로 직접 입력) destination
+  // 문자열의 나라 이름이 "대한민국"인지로 판단한다.
+  function isDomesticTrip(trip) {
+    if (trip.destinationId) return false;
+    const cityMeta = trip.cityId ? destinations?.getCityById(trip.cityId) : null;
+    if (cityMeta) return cityMeta.region === "domestic";
+    return splitDestination(trip).country === "대한민국";
+  }
+
   // key가 있으면 data-card로 남겨 hydrateExchangeCard/hydrateWeatherCard가 나중에 그 카드의 body만 찾아 바꾼다.
   function cardHtml({ key, icon, title, bodyHtml }, timeLabel) {
     return `
@@ -212,6 +223,15 @@
       : rate.toLocaleString("ko-KR", { maximumFractionDigits: 2 });
   }
 
+  // 1단위당 원화가 1원도 안 되는 통화(VND·IDR 등)는 "1 동 = ₩0"처럼 보여줄 게 없어진다 - 한국 기준 1원
+  // 이상이 되는 10의 거듭제곱 단위(1 → 10 → 100 → ...)로 올려서 보여준다("100동 = ₩5.4"). USD처럼 1단위가
+  // 이미 1원을 넘는 통화는 그대로 1단위(unit === 1)를 쓴다.
+  function exchangeDisplayUnit(rate) {
+    let unit = 1;
+    while (unit * rate < 1) unit *= 10;
+    return unit;
+  }
+
   // open.er-api.com/v6/latest/<코드>: 키 없이 쓰는 무료 환율 API(하루 1회 갱신). rates.KRW가 "그 통화 1단위 = 몇 원"이다.
   async function fetchExchangeRateToKrw(code) {
     const res = await fetch(`https://open.er-api.com/v6/latest/${encodeURIComponent(code)}`);
@@ -222,27 +242,54 @@
     return rate;
   }
 
+  // destinationId가 있는(새 체계) 여행은 trip.currency(확정된 ISO 코드)를 그대로 쓴다 - 모르는 나라면
+  // (country_currency에 없음, 015 참고) currency가 null이고, 이땐 틀린 통화를 보여주는 대신 카드 자체를
+  // 지운다(airport-congestion 카드와 같은 "정보 없으면 자리 자체를 지운다" 규칙, 위 파일 head 주석 참고).
+  // destinationId가 없는(국내·옛 방식) 여행은 destination 문자열의 나라 이름으로 찾는 기존 방식 그대로.
   async function hydrateExchangeCard(el, trip, gen) {
     const body = el.querySelector('.mytrip-card[data-card="exchange"] .mytrip-card-body');
     if (!body) return;
 
+    if (isDomesticTrip(trip)) {
+      el.querySelector('.mytrip-card[data-card="exchange"]')?.remove(); // 국내 여행은 환전이 필요 없어 카드 자체를 지운다
+      return;
+    }
+
     const currencyData = window.TripLog.currencyData;
-    const { country } = splitDestination(trip);
-    const dest = currencyData?.findByCountry(country);
-    const code = dest?.code ?? "USD";
-    const nameKo = dest?.nameKo ?? "달러";
+    let code;
+    let nameKo;
+    if (trip.destinationId) {
+      if (!trip.currency) {
+        el.querySelector('.mytrip-card[data-card="exchange"]')?.remove();
+        return;
+      }
+      code = trip.currency;
+      nameKo = currencyData?.findByCode(code)?.nameKo ?? code; // 자주 쓰는 10여 개 외엔 한글 이름이 없어서 코드 자체를 보여준다
+    } else {
+      const { country } = splitDestination(trip);
+      const dest = currencyData?.findByCountry(country);
+      code = dest?.code ?? "USD";
+      nameKo = dest?.nameKo ?? "달러";
+    }
 
     try {
       const rate = await fetchExchangeRateToKrw(code);
       writeExchangeCache(code, rate);
       if (el.dataset.statusGen !== String(gen)) return; // 그 사이 새로고침/다른 화면 이동
-      body.innerHTML = statBodyHtml(`1 ${nameKo}(${code}) = ₩${formatKrw(rate)}`, "실시간 환율 · open.er-api.com");
+      const unit = exchangeDisplayUnit(rate);
+      body.innerHTML = statBodyHtml(`${unit} ${nameKo}(${code}) = ₩${formatKrw(unit * rate)}`, "실시간 환율 · open.er-api.com");
     } catch {
       if (el.dataset.statusGen !== String(gen)) return;
       const cached = readExchangeCache(code);
-      body.innerHTML = cached
-        ? statBodyHtml(`1 ${nameKo}(${code}) = ₩${formatKrw(cached.rate)}`, `갱신 실패, ${formatTimeLabel(new Date(cached.fetchedAt))}`)
-        : loadingBodyHtml("환율 정보를 불러오지 못했어요.");
+      if (!cached) {
+        body.innerHTML = loadingBodyHtml("환율 정보를 불러오지 못했어요.");
+        return;
+      }
+      const unit = exchangeDisplayUnit(cached.rate);
+      body.innerHTML = statBodyHtml(
+        `${unit} ${nameKo}(${code}) = ₩${formatKrw(unit * cached.rate)}`,
+        `갱신 실패, ${formatTimeLabel(new Date(cached.fetchedAt))}`
+      );
     }
   }
 
@@ -282,9 +329,16 @@
     return WEATHER_CODE_LABELS[code] ?? { icon: "🌡️", label: "정보 없음" };
   }
 
-  // open-meteo 지오코딩: 도시 이름 → 위도/경도 (키 없이 쓰는 무료 API). destinations.js에 등록된 도시면
-  // 영문 위키 제목(더 검색이 잘 된다)을, 아니면 목적지 문자열의 도시 부분을 그대로 검색어로 쓴다.
+  // 좌표+시간대 확정: destinationId가 있는(새 체계) 여행은 여행지 선택 화면에서 이미 확정해 둔
+  // trip.lat/lng/trip.timezone(IANA 이름, 017_trips_timezone.sql)을 그대로 쓴다(재지오코딩 없음 - 느리고,
+  // 동명이인 도시로 잘못 짚을 수도 있다). 없으면(국내·옛 방식) 도시 이름으로 Open-Meteo Geocoding을 부르는
+  // 기존 방식 그대로: destinations.js에 등록된 도시면 영문 위키 제목(더 검색이 잘 된다)을, 아니면 목적지
+  // 문자열의 도시 부분을 검색어로 쓴다 - 이 응답에는 IANA 시간대 이름(timezone)도 같이 온다. 날씨 카드뿐
+  // 아니라 시차 카드도 이 함수를 그대로 쓴다(같은 좌표 조회 결과를 재사용 - 시차 계산용 API를 따로 안 부른다).
   async function geocodeCity(trip) {
+    if (typeof trip.lat === "number" && typeof trip.lng === "number") {
+      return { lat: trip.lat, lng: trip.lng, timezone: trip.timezone ?? null };
+    }
     const cityMeta = trip.cityId ? destinations?.getCityById(trip.cityId) : null;
     const query = cityMeta?.wiki?.replace(/_/g, " ") || splitDestination(trip).city;
     const res = await fetch(`https://geocoding-api.open-meteo.com/v1/search?name=${encodeURIComponent(query)}&count=1&language=ko&format=json`);
@@ -292,7 +346,7 @@
     const data = await res.json();
     const hit = data?.results?.[0];
     if (!hit) throw new Error("위치를 찾지 못했어요");
-    return { lat: hit.latitude, lng: hit.longitude };
+    return { lat: hit.latitude, lng: hit.longitude, timezone: hit.timezone ?? null };
   }
 
   // open-meteo 일별 예보: 무료 요금제는 오늘부터 최대 16일치까지만 나온다.
@@ -347,12 +401,77 @@
     }
   }
 
-  // [여행 전 3/4] 현지 뉴스 — 처음엔 로딩 문구만 그리고, hydrateBriefingCards가 실제 값을 채운다.
+  // ---- 실시간 연동: 시차 (geocodeCity의 timezone만 쓴다 - 별도 API 호출 없음) ----
+  // 날씨 카드 바로 밑에 독립된 카드로 보여준다(날씨 fetch 성공/실패와 분리 - 예보가 16일 범위를 벗어나도
+  // 시차는 상관없이 보여줄 수 있어야 한다). IANA 시간대 이름만 있으면 그 시간대의 "지금" 오프셋을
+  // Intl.DateTimeFormat으로 직접 계산한다(DST가 있는 지역도 date 기준으로 맞게 나온다).
+
+  const KST_OFFSET_MINUTES = 9 * 60; // 한국은 DST가 없어 늘 고정값
+
+  // timeZone(IANA 이름) 기준으로 date가 그 시간대에서 몇 시 몇 분인지, UTC와 몇 분 차이나는지를 한 번에 구한다 -
+  // "그 시간대로 날짜를 포맷했을 때의 값을 UTC로 다시 해석해 원래 시각과 비교"하는 표준 트릭이다.
+  function resolveTimezoneInfo(timeZone, date) {
+    const parts = new Intl.DateTimeFormat("en-US", {
+      timeZone,
+      hour12: false,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+      second: "2-digit",
+    })
+      .formatToParts(date)
+      .reduce((acc, p) => ((acc[p.type] = p.value), acc), {});
+    const asUtc = Date.UTC(+parts.year, +parts.month - 1, +parts.day, +parts.hour, +parts.minute, +parts.second);
+    return { offsetMinutes: Math.round((asUtc - date.getTime()) / 60000), hour: Number(parts.hour), minute: Number(parts.minute) };
+  }
+
+  // 한국(KST, UTC+9) 기준 시차 한 줄 - "한국보다 2시간 빨라요"/"한국보다 1시간 늦어요"/"한국과 시차가 없어요".
+  // 30분 단위 시차(인도 등)도 그대로 보이게 소수 둘째 자리까지 허용한다.
+  function timeDiffLabel(offsetMinutes) {
+    const diffHours = Math.round(((offsetMinutes - KST_OFFSET_MINUTES) / 60) * 100) / 100;
+    if (diffHours === 0) return "한국과 시차가 없어요";
+    const hourLabel = `${Math.abs(diffHours)}시간`;
+    return diffHours > 0 ? `한국보다 ${hourLabel} 빨라요` : `한국보다 ${hourLabel} 늦어요`;
+  }
+
+  // "오후 3시" | "오후 3시 20분" - formatTimeLabel과 같은 포맷이지만 임의 시간대 기준이다.
+  function clockLabel(hour, minute) {
+    const period = hour < 12 ? "오전" : "오후";
+    const h12 = hour % 12 === 0 ? 12 : hour % 12;
+    return minute === 0 ? `${period} ${h12}시` : `${period} ${h12}시 ${minute}분`;
+  }
+
+  async function hydrateTimezoneCard(el, trip, gen) {
+    const body = el.querySelector('.mytrip-card[data-card="timezone"] .mytrip-card-body');
+    if (!body) return; // buildCards가 국내 여행이면 애초에 이 카드를 안 만들었으니 할 일이 없다
+
+    try {
+      const loc = await geocodeCity(trip);
+      if (!loc.timezone) throw new Error("시간대 정보 없음");
+      if (el.dataset.statusGen !== String(gen)) return;
+
+      const { offsetMinutes, hour, minute } = resolveTimezoneInfo(loc.timezone, new Date());
+      body.innerHTML = statBodyHtml(timeDiffLabel(offsetMinutes), `현지 시각 ${clockLabel(hour, minute)}`);
+    } catch {
+      if (el.dataset.statusGen !== String(gen)) return;
+      body.innerHTML = loadingBodyHtml("시차 정보를 불러오지 못했어요.");
+    }
+  }
+
+  // [여행 전] 시차 — 날씨 카드 바로 밑의 독립된 카드. 국내 여행이면 buildCards가 애초에 만들지 않는다.
+  // 처음엔 로딩 문구만 그리고, hydrateTimezoneCard가 채운다.
+  function buildTimezoneCard() {
+    return { key: "timezone", icon: "🕐", title: "시차", bodyHtml: loadingBodyHtml("시차를 확인하는 중이에요...") };
+  }
+
+  // [여행 전] 현지 뉴스 — 처음엔 로딩 문구만 그리고, hydrateBriefingCards가 실제 값을 채운다.
   function buildNewsCard() {
     return { key: "news", icon: "📰", title: "현지 뉴스", bodyHtml: loadingBodyHtml("현지 뉴스를 불러오는 중이에요...") };
   }
 
-  // [여행 전 4/4] 할인 정보 — 처음엔 로딩 문구만 그리고, hydrateBriefingCards가 실제 값을 채운다.
+  // [여행 전] 할인 정보 — 처음엔 로딩 문구만 그리고, hydrateBriefingCards가 실제 값을 채운다.
   function buildDiscountCard() {
     return { key: "discount", icon: "🏷️", title: "할인 정보", bodyHtml: loadingBodyHtml("할인 정보를 불러오는 중이에요...") };
   }
@@ -608,7 +727,10 @@
   // 상태별 카드 목록. 순서 = 급한 것부터(요청 2번): 출발 전은 교통상황(공항 이동) → 혼잡도 순.
   function buildCards(trip, result) {
     if (result.phase === PHASE.BEFORE_TRIP) {
-      return [buildExchangeCard(), buildWeatherCard(), buildNewsCard(), buildDiscountCard()];
+      const cards = [buildExchangeCard(), buildWeatherCard()];
+      if (!isDomesticTrip(trip)) cards.push(buildTimezoneCard()); // 국내 여행은 시차가 없어 카드 자체를 안 만든다
+      cards.push(buildNewsCard(), buildDiscountCard());
+      return cards;
     }
     if (result.phase === PHASE.BEFORE_DEPARTURE) {
       const cards = [buildAirportTrafficCard()];
@@ -658,6 +780,7 @@
     if (result.phase === PHASE.BEFORE_TRIP) {
       hydrateExchangeCard(el, trip, gen);
       hydrateWeatherCard(el, trip, gen, now);
+      hydrateTimezoneCard(el, trip, gen);
       hydrateBriefingCards(el, trip, gen);
     }
     if (result.phase === PHASE.BEFORE_DEPARTURE) {

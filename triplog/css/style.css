@@ -7,6 +7,7 @@
    5. 단계형 모달(위저드) 공통 · 탭 · 선택 목록 · 달력  [WIZARD] [TRIP-SETUP] [CALENDAR]
    6. 일정 화면: 헤더 · 빠른 메뉴 · 지도 · 타임라인 · 일정 추가 창  [SCHEDULE] [INVITE] [QUICK-MENU] [DAY-MAP] [TIMELINE] [SCHEDULE-FORM]
    7. 항공편  [FLIGHT]
+   7-1. 기타 교통편(기차·버스·선박) 등록 창  [TRANSPORT-FORM]
    8. 숙소  [LODGING]
    9. 화면(라우트) 공통 · 메인 화면 · 초대 화면 · 로그인 화면  [MAIN] [INVITE-PAGE] [LOGIN]
    10. 나의 여행 화면  [MYTRIP] [MEMBERS]
@@ -14,9 +15,10 @@
    12. 반응형 · 접근성  [RESPONSIVE]
    13. 별칭 보기 (개발용)  [ALIAS-VIEW]
    14. 가계부 (#/budget/:id)  [BUDGET] [BUDGET-SWIPE] [EXPENSE-FORM]
-   15. 여행지갑 (#/wallet)  [WALLET] [WALLET-FORM] [WALLET-VIEWER]
+   15. 여행지갑 (#/wallet/:id)  [WALLET] [WALLET-FORM] [WALLET-VIEWER]
    16. 여행 가져오기 창  [TRIP-IMPORT-MODAL]
    17. 여행 가져오기 미리보기 창  [TRIP-IMPORT-PREVIEW]
+   18. 관리 페이지 (/admin, SPA 밖 독립 페이지)  [ADMIN]
 */
 
 /* ==========================================================================
@@ -106,6 +108,19 @@
   --route-6-ink: #fff8f1;
   --route-line: #5c4a3d; /* 같은 Day의 장소를 잇는 점선 (따뜻한 톤의 짙은 회갈색) */
 
+  /* 인기 여행지 카드(메인 화면 '어디로 떠나볼까요', travelFeed.js)의 그라데이션 배경 - 외부 사진 대신 쓴다.
+     country_code(해외)/name_ko(국내)를 해시해서 이 6개 중 하나를 결정적으로 고르므로(같은 나라/도시는
+     항상 같은 색) "지역별로 색을 다르게"를 만족한다. 색상환을 고르게 나눠 서로 구별되게 했지만(파스텔
+     톤 정책), --route-* 팔레트와 달리 이 저장소에 scripts/validate_palette.js가 없어 수치로 검증하진
+     못했다 - 카드에 순위 숫자·이니셜 글자가 항상 같이 보여서(secondary encoding) 색만으로 구분해야 하는
+     상황은 아니다. */
+  --dest-gradient-1: linear-gradient(135deg, #a9ddf7, #7fb3ea); /* 블루 */
+  --dest-gradient-2: linear-gradient(135deg, #fbd7a8, #f2a35e); /* 오렌지 */
+  --dest-gradient-3: linear-gradient(135deg, #c7e8c2, #8fcf9b); /* 그린 */
+  --dest-gradient-4: linear-gradient(135deg, #e6cdf7, #c79ae8); /* 퍼플 */
+  --dest-gradient-5: linear-gradient(135deg, #fde6a0, #f6c667); /* 옐로우 */
+  --dest-gradient-6: linear-gradient(135deg, #f8cbdd, #ef9cc0); /* 핑크 */
+
   /* 소셜 로그인 버튼: 각 서비스의 대표 색 (구글은 흰 바탕에 회색 테두리, 카카오는 노랑, 네이버는 초록) */
   --brand-google-border: #747775;
   --brand-google-text: #1f1f1f;
@@ -118,6 +133,7 @@
   --mint: #64cbc0; /* 헤더·카테고리 탭바 배경 */
   --mint-dark: #52b7ac; /* 날짜 알약 */
   --mint-deep: #23968a; /* 흰 배경 위의 민트 글자·테두리 */
+
 
   /* 모서리 */
   --radius-sm: 8px;
@@ -552,6 +568,7 @@ body.has-trip-shell {
 .tab-row--sub {
   overflow-x: auto;
   gap: var(--space-2);
+  padding-bottom: var(--space-2); /* 가로 스크롤 막대가 바로 아래 버튼(테두리)과 겹치지 않게 막대 자리만큼 띄운다 */
 }
 
 .tab-row--sub .tab {
@@ -647,6 +664,85 @@ body.has-trip-shell {
 .pick-btn--selected {
   background: var(--accent);
   color: #ffffff;
+}
+
+.pick-btn:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+/* 해외 도시 확정(search-destination select) 실패 - 안내 + 다시 시도 */
+.pick-item--error {
+  border-color: var(--danger);
+}
+
+.pick-sub--error {
+  color: var(--text-danger);
+}
+
+/* destinations 프리셋 로딩 중 스켈레톤 (PRD v12 - 여행지 탭 확장) */
+.pick-item--skeleton {
+  border-style: dashed;
+}
+
+.pick-skeleton-block,
+.pick-skeleton-line {
+  background: var(--surface-muted);
+  animation: pick-skeleton-pulse 1.4s ease-in-out infinite;
+}
+
+.pick-skeleton-line {
+  display: block;
+  height: 14px;
+  border-radius: var(--radius-sm);
+}
+
+.pick-skeleton-line--name {
+  width: 40%;
+}
+
+.pick-skeleton-line--sub {
+  width: 60%;
+  height: 11px;
+}
+
+@keyframes pick-skeleton-pulse {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* destinations 프리셋 로딩 실패 - .pick-empty에 재시도 버튼을 더한 모양 */
+.pick-empty--error {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+}
+
+/* 자유 검색(PRD v12 3번) - 프리셋 결과의 "추천" 배지, 검색 중 안내문 */
+.pick-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 1px 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  color: var(--text-accent);
+  font-size: 10px;
+  font-weight: 700;
+  vertical-align: middle;
+}
+
+.pick-empty--loading,
+.pick-search-more {
+  animation: pick-skeleton-pulse 1.4s ease-in-out infinite; /* 위 스켈레톤과 같은 keyframe 재사용 */
+}
+
+.pick-search-more {
+  padding: var(--space-3) var(--space-4);
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
 }
 
 .cal-head {
@@ -757,6 +853,15 @@ body.has-trip-shell {
   background: var(--surface);
 }
 
+/* 여행지 검색창만 탭/목록 위에 고정 (.search-input 자체는 항공사 검색 등 다른 곳과 공유하는 클래스라
+   거기엔 영향 없게 id로 좁힌다) - 결과가 길어서 .wizard-body가 스크롤돼도 검색창은 그대로 보인다. */
+#city-search {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  background: var(--surface);
+}
+
 .pick-empty {
   padding: var(--space-6) var(--space-4);
   text-align: center;
@@ -836,7 +941,7 @@ body.has-trip-shell {
   color: var(--text-accent);
 }
 
-/* "교통편" 버튼에만 붙는 펼침 표시(기차/버스/선박 목록, app.js#openTransportMenu) */
+/* "교통편" 버튼에만 붙는 펼침 표시(항공/기타 목록, app.js#openTransportMenu) */
 .quick-transport-trigger-caret {
   margin-left: 2px;
   color: var(--text-muted);
@@ -2100,6 +2205,220 @@ body.has-trip-shell {
 }
 
 /* ==========================================================================
+   7-1. 기타 교통편(기차·버스·선박) 등록 창  [TRANSPORT-FORM]
+   일정 화면의 QUICK-MENU "교통편" 드롭다운에서 "기타"를 고르면 열리는 작은 모달(.modal, 420px 캡).
+   날짜(Day) 드롭다운은 expenseForm.js의 .expense-day-*와 같은 모양, 카테고리는 같은 파일의
+   .expense-category-*(원형 아이콘 + 아래 라벨)와 같은 모양을 이 창만의 클래스 이름으로 그대로 옮겼다.
+   ========================================================================== */
+
+/* 이 창만 배경을 파스텔 블루로 - 다른 .modal(흰 배경)은 그대로 둔다 */
+.transport-modal {
+  background: var(--surface-blue);
+}
+
+/* 등록 버튼만 파스텔 블루로 - 다른 화면의 .btn-save(진한 --accent)는 그대로 둔다(.lodging-map-search
+   .btn-save 등과 같은 토큰 재사용 방식) */
+.transport-modal .btn-save {
+  background: var(--dday-pastel-bg);
+}
+
+.transport-day-picker {
+  position: relative;
+}
+
+.transport-day-trigger {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  min-height: var(--tap-min);
+  padding-inline: var(--space-3);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.transport-day-trigger:hover,
+.transport-day-trigger:focus-visible {
+  border-color: var(--accent);
+}
+
+.transport-day-caret {
+  color: var(--text-muted);
+  font-size: 10px;
+}
+
+.transport-day-list {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 1;
+  width: 100%;
+  max-height: 240px;
+  margin: 0;
+  padding: var(--space-2) 0;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-md);
+  list-style: none;
+}
+
+.transport-day-option {
+  padding: 8px var(--space-3);
+  color: var(--text);
+  font-size: 14px;
+  cursor: pointer;
+}
+
+.transport-day-option:hover,
+.transport-day-option--active {
+  background: var(--surface-muted);
+}
+
+.transport-category-chips {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: var(--space-2);
+  padding-bottom: 2px; /* 스크롤바가 없어도 칩 테두리가 안 잘리게 */
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+
+.transport-category-chips::-webkit-scrollbar {
+  display: none;
+}
+
+.transport-category-item {
+  display: flex;
+  flex-shrink: 0;
+  flex-direction: column;
+  align-items: center;
+  width: 56px;
+  border: none;
+  background: transparent;
+  cursor: pointer;
+}
+
+.transport-category-icon {
+  display: flex;
+  width: 44px;
+  height: 44px;
+  margin-bottom: 4px;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+  background: var(--surface-muted);
+  font-size: 20px;
+}
+
+.transport-category-item--active .transport-category-icon {
+  background: var(--accent);
+}
+
+.transport-category-label {
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 600;
+  text-align: center;
+}
+
+.transport-category-item--active .transport-category-label {
+  color: var(--text-accent);
+  font-weight: 700;
+}
+
+/* 출발지/도착지 한 줄: 장소 입력칸이 남는 공간을 채우고, 시간 입력은 고정 폭 */
+.transport-row {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.transport-row input[type="text"] {
+  flex: 1;
+  min-width: 0;
+}
+
+.transport-row input[type="time"] {
+  flex-shrink: 0;
+  min-height: var(--tap-min);
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-family: inherit;
+}
+
+/* 출발지/도착지 지도 검색: schedule.js의 장소 칸(.schedule-place-*)과 같은 방식(포커스하면 입력칸 바로
+   아래에 지도가 나타나고, 검색 결과를 고르거나 지도를 눌러 이름을 채운다) - 다만 좌표는 저장하지 않는다
+   (item.transport은 이름만 쓴다, transportForm.js 참고). 결과를 못 찾으면 그냥 입력칸에 직접 입력하면 된다. */
+.transport-place-map-wrap {
+  margin-top: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.transport-place-results {
+  margin: 0;
+  padding: var(--space-2) 0;
+  max-height: 140px;
+  overflow-y: auto;
+  list-style: none;
+  border-bottom: 1px solid var(--border);
+}
+
+.transport-place-results:empty {
+  display: none;
+  border-bottom: none;
+}
+
+.transport-place-result {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px var(--space-3);
+  cursor: pointer;
+}
+
+.transport-place-result:hover {
+  background: var(--surface-muted);
+}
+
+.transport-place-result-name {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.transport-place-result-sub {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.transport-place-status {
+  margin: 0;
+  padding: var(--space-2) var(--space-3);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.transport-place-status:empty {
+  display: none;
+}
+
+.transport-place-map {
+  height: 180px;
+}
+
+/* ==========================================================================
    8. 숙소 (#/lodging/:id)  [LODGING]
    일정 화면의 QUICK-MENU "숙소"에서 들어오는 새 화면(모달 아님, 가계부/여행지갑과 같은 구조).
    화면 전체는 고정이다. 첫 화면이 곧 map(지도에서 찾기)이고, 숙소를 고르면 dates(체크인/체크아웃)로
@@ -2365,6 +2684,107 @@ body.has-trip-shell {
   margin: 0 calc(var(--space-5) * -1);
 }
 
+/* 설정 화면(#/settings) "알림" 섹션의 켜고 끄는 스위치 한 줄 - 체크박스 자체는 숨기고
+   .toggle-switch-track이 배경/동그라미를 그린다. on/off가 뚜렷해야 해서 .consent-checkbox-row
+   체크박스 대신 새로 만든 것(기존 레이아웃에 없는 모양이라 Conventions의 "재사용" 예외) */
+.settings-toggle-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  min-height: 56px;
+  padding: var(--space-2) var(--space-5);
+}
+
+.settings-toggle-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.settings-toggle-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.settings-toggle-desc {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.settings-toggle-row--static .settings-toggle-desc {
+  color: var(--text-faint);
+}
+
+.toggle-switch {
+  position: relative;
+  flex-shrink: 0;
+  display: inline-flex;
+  width: 46px;
+  height: 26px;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  position: absolute;
+  inset: 0;
+  margin: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
+.toggle-switch-track {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: var(--border);
+  transition: background 0.15s ease;
+}
+
+.toggle-switch-track::before {
+  content: "";
+  position: absolute;
+  top: 3px;
+  left: 3px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.2);
+  transition: transform 0.15s ease;
+}
+
+.toggle-switch input:checked + .toggle-switch-track {
+  background: var(--accent);
+}
+
+.toggle-switch input:checked + .toggle-switch-track::before {
+  transform: translateX(20px);
+}
+
+/* 알림 권한 배너(허용 전 "알림 켜기" 버튼 / 거부됨 안내 / iOS Safari 안내) - 토글 목록 맨 위 줄 */
+.settings-permission-row {
+  padding: var(--space-2) var(--space-5) var(--space-3);
+  border-bottom: 1px solid var(--border);
+  margin-bottom: var(--space-2);
+}
+
+.settings-permission-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* 네이티브 FCM 등록 실패("알림 등록에 실패했어요") - 폰트 색상 6역할 중 레드 계열은 --text-danger (CLAUDE.md) */
+.settings-permission-note--error {
+  color: var(--text-danger);
+}
+
+.settings-permission-btn {
+  width: 100%;
+}
+
 /* [LEGAL-PAGE] 이용약관·개인정보처리방침(legalPages.js) - 초안이라는 안내(버전·시행 전) + 본문 */
 .legal-meta {
   margin: 0 0 var(--space-5);
@@ -2463,6 +2883,13 @@ body.has-trip-shell {
 .main-section-title span {
   margin-left: 4px;
   font-size: 14px;
+  color: var(--text-muted);
+}
+
+/* '어디로 떠나볼까요?' 제목 아래 짧은 설명(요청 4번) - 월별로 바뀌지 않는 고정 문구 */
+.main-section-subtitle {
+  margin: 2px 0 var(--space-3);
+  font-size: 13px;
   color: var(--text-muted);
 }
 
@@ -2665,6 +3092,509 @@ body.has-trip-shell {
   color: var(--text-muted);
 }
 
+/* [MAIN-FEED] 메인 화면 '여행 소식' 영역(travelFeed.js) - "내 여행" 섹션과 같은 .main-trips-head/
+   .main-section-title를 그대로 쓰고, 탭/칩은 .tab-row/.tab/.tab-row--sub를 그대로 재사용한다(새 탭 스타일을
+   만들지 않는다). 여기서부터는 카드·배지·상세 모달처럼 이 영역에만 있는 모양만 새로 정의한다. */
+.main-feed {
+  margin-top: var(--space-6);
+}
+
+.main-feed [data-feed-kind-tabs] {
+  margin-bottom: var(--space-3);
+}
+
+.main-feed [data-feed-scope-chips] {
+  margin-bottom: var(--space-3);
+}
+
+.feed-card-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.feed-card {
+  padding: var(--space-3) var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+.feed-card-top {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.feed-badge {
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  color: var(--text-muted);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+/* 중요도 배지 - 색만이 아니라 글자(높음/보통/참고)로도 구분한다(요청사항). 파스텔 톤 정책: 새로 꾸미는
+   배지라 진한 --danger 대신 D-day 배지와 같은 --danger-pastel을 쓴다. */
+.feed-badge--high {
+  background: var(--danger-pastel);
+  color: #ffffff;
+}
+
+.feed-badge--medium {
+  background: var(--surface-muted);
+  color: var(--text-soft);
+}
+
+.feed-badge--low {
+  background: var(--surface-muted);
+  color: var(--text-faint);
+}
+
+/* "내 여행지"/"내 항공편" 매칭 라벨(get_travel_feed의 is_my_destination/is_my_airline) */
+.feed-match-label {
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--page-bg-blue);
+  color: var(--text-accent);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.feed-card-title {
+  margin: 0 0 2px;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.feed-card-meta,
+.feed-card-source {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.feed-more-btn {
+  width: 100%;
+  min-height: var(--tap-min);
+  margin-top: var(--space-2);
+  border: none;
+  background: transparent;
+  color: var(--text-accent);
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.feed-empty {
+  padding: var(--space-5) 0;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+.feed-empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-4) 0;
+}
+
+/* 로딩 스켈레톤 - destinations 프리셋 로딩(.pick-skeleton-line, pick-skeleton-pulse)과 같은 부품 재사용,
+   카드 안에서의 너비·순서만 이 셋으로 새로 잡는다 */
+.feed-card--skeleton {
+  cursor: default;
+}
+
+.feed-skeleton-badge {
+  display: block;
+  width: 56px;
+  height: 18px;
+  border-radius: var(--radius-pill);
+  margin-bottom: var(--space-2);
+}
+
+.feed-skeleton-title {
+  width: 70%;
+  height: 16px;
+  margin-bottom: 6px;
+}
+
+.feed-skeleton-meta {
+  width: 45%;
+}
+
+/* 상세 모달 - .modal-overlay/.modal을 그대로 쓰고(mainPage.js의 삭제 확인창과 같은 기반), 안쪽 내용만 */
+.feed-detail-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--space-3);
+}
+
+.feed-detail-meta {
+  margin: 0 0 var(--space-3);
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+.feed-detail-summary {
+  margin: 0 0 var(--space-3);
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+
+.feed-detail-action-tip {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-3);
+  border-radius: var(--radius-sm);
+  background: var(--page-bg-blue);
+  font-size: 13px;
+  line-height: 1.5;
+  color: var(--text-soft);
+}
+
+.feed-detail-source-name {
+  margin: 0 0 2px;
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.feed-detail-checked {
+  margin: 0 0 var(--space-4);
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.feed-detail-disclaimer {
+  margin: var(--space-3) 0 0;
+  font-size: 12px;
+  text-align: center;
+  color: var(--text-muted);
+}
+
+/* [MAIN-POPULAR] 메인 화면 '어디로 떠나볼까요?' 영역(travelFeed.js) - 기본(모바일)은 가로 스크롤 카드,
+   720px부터는 그리드로 바꿔도 된다는 지시(요청 6번)에 따라 바꾼다. 탭은 .tab-row를 그대로 재사용.
+   요청 5번: 데이터가 없거나 실패하면 travelFeed.js가 이 섹션 자체에 hidden을 건다(조용히 숨김) - 그래서
+   아래 스타일은 "보일 때" 모양만 신경 쓰면 된다. */
+.main-popular {
+  margin-top: var(--space-6);
+}
+
+.main-popular [data-popular-tabs] {
+  margin-bottom: var(--space-3);
+}
+
+/* .dest-card-wrap/.dest-card/.dest-card-art/.dest-card-initial/.dest-card-name은 메인 화면에서는 더 안
+   쓴다(어디로 떠나볼까요가 discover-card-*로 교체됨) - admin.html의 "도시 이미지" 탭 대체 카드
+   미리보기(adminPage.js#fallbackCardHtml)가 아직 이 네 클래스를 그대로 쓰고 있어서 지우지 않는다. */
+.dest-card-wrap {
+  flex: 0 0 132px;
+}
+
+.dest-card {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.dest-card-art {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-md);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.dest-card-initial {
+  font-size: 32px;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.dest-card-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+/* ==========================================================================
+   '어디로 떠나볼까요?' (discover-card-*, get_discover_cities 기반 — 메인 화면 개선 2차)
+   이미지 전체 배경 + 하단 그라데이션 오버레이 카드. 모바일은 가로 스크롤(카드 폭 160px, 세로로 긴
+   3:4 비율), 720px부터 그리드로 바뀐다(요청 2번). 이미지 로딩 전/실패에도 레이아웃이 흔들리지 않게
+   .discover-card-media가 항상 aspect-ratio로 자리를 미리 잡아 둔다.
+   ========================================================================== */
+
+.discover-card-row {
+  list-style: none;
+  margin: 0 0 var(--space-2);
+  padding: 0 0 var(--space-2); /* 가로 스크롤 막대가 카드 바로 아래와 겹치지 않게(.tab-row--sub와 같은 이유) */
+  display: flex;
+  gap: var(--space-3);
+  overflow-x: auto;
+  -webkit-overflow-scrolling: touch;
+}
+
+.discover-card-wrap {
+  flex: 0 0 160px;
+}
+
+.discover-card {
+  display: block;
+  width: 100%;
+  padding: 0;
+  border: none;
+  background: transparent;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.discover-card-media {
+  display: block; /* <span>의 기본값(inline)이면 width/aspect-ratio가 적용되지 않아 0x0으로 접힌다 */
+  position: relative;
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface-muted); /* 이미지가 로딩되는 동안/실패해도 보일 바탕 - 레이아웃은 이미 고정돼 있다 */
+}
+
+.discover-card-image {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.discover-card-media--fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.discover-card-initial {
+  font-size: 36px;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+}
+
+.discover-card-overlay {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: var(--space-2);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  background: linear-gradient(to top, rgba(0, 0, 0, 0.75), rgba(0, 0, 0, 0) 70%);
+}
+
+.discover-card-tag {
+  align-self: flex-start;
+  font-size: 11px;
+  font-weight: 700;
+  color: #ffffff;
+  background: rgba(255, 255, 255, 0.22);
+  padding: 2px 8px;
+  border-radius: 999px;
+  margin-bottom: 2px;
+}
+
+.discover-card-name {
+  font-size: 15px;
+  font-weight: 800;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.3);
+}
+
+.discover-card-meta {
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.9);
+}
+
+.discover-card-skeleton {
+  width: 100%;
+  aspect-ratio: 3 / 4;
+  border-radius: var(--radius-md);
+  background: var(--surface-muted);
+  animation: pick-skeleton-pulse 1.4s ease-in-out infinite; /* 위쪽(destinations 프리셋 로딩)과 같은 keyframe 재사용 */
+}
+
+@media (min-width: 720px) {
+  .discover-card-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+    overflow-x: visible;
+  }
+
+  .discover-card-wrap {
+    flex: none;
+  }
+}
+
+/* 도시 정보 화면(#/discover-city/:id) - 카드를 누르면 오는 곳. 여행 만들기 버튼이 없는 순수 정보 화면. */
+
+.discover-detail-hero {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 4 / 3;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface-muted);
+  margin-bottom: var(--space-3);
+}
+
+.discover-detail-hero img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.discover-detail-hero--fallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.discover-detail-hero--fallback .discover-card-initial {
+  font-size: 56px;
+}
+
+/* 하단 고정 CTA(.discover-detail-cta)가 콘텐츠를 가리지 않게 미리 여백을 비워 둔다 - 버튼 실측 높이에
+   맞춘 값이 아니라 넉넉히 잡은 근사치다(요청 5번, 하단 고정 버튼). */
+.discover-detail-body {
+  padding-bottom: 100px;
+}
+
+.discover-detail-meta {
+  margin: 0 0 var(--space-3);
+  color: var(--text-muted);
+  font-size: 14px;
+}
+
+/* 섹션 단위 컴포넌트(요청 7번) - '지금 가기 좋은 이유'/'대표 관광지' 둘 다 이 틀을 쓴다. 나중에 섹션이
+   늘어나도(하이라이트 상세, 일정 담기, 주변 추천 등) 같은 틀만 재사용하면 된다. */
+.discover-detail-section {
+  margin: 0 0 var(--space-5);
+}
+
+.discover-detail-section-title {
+  margin: 0 0 var(--space-2);
+  font-size: 15px;
+  font-weight: 800;
+}
+
+.discover-detail-tag {
+  display: inline-block;
+  margin: 0 0 var(--space-2);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--text-soft);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.discover-detail-reason-text {
+  margin: 0 0 var(--space-2);
+  font-size: 14px;
+  color: var(--text);
+}
+
+.discover-detail-weather {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 0 var(--space-4);
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+.discover-detail-highlights {
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.discover-detail-highlight-name {
+  margin: 0;
+  font-weight: 700;
+  font-size: 14px;
+}
+
+.discover-detail-highlight-summary {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-muted);
+}
+
+/* 사진 저작자 표기(요청 5번) - 항상 보이는 한 줄, 도시 상세 화면 하단 */
+.discover-detail-credit {
+  margin: var(--space-4) 0 0;
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border);
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.discover-detail-credit a {
+  color: var(--text-accent);
+}
+
+/* 하단 고정 CTA(요청 5번) - 이 화면이 SHELL이 아니라 일반 .page라 .budget-total-bar처럼 부모 flex에
+   기대지 못한다 - .wallet-fab과 같은 이유로 position:fixed + 안전영역을 직접 쓴다. */
+.discover-detail-cta {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  width: 100%;
+  max-width: var(--content-max);
+  margin-inline: auto;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  padding: var(--space-4) var(--space-5) calc(var(--space-4) + env(safe-area-inset-bottom));
+  background: var(--surface);
+  border-top: 1px solid var(--border);
+  box-shadow: 0 -2px 8px rgba(0, 0, 0, 0.06);
+}
+
 /* [MAIN-ACCOUNT] 로고 옆(MAIN-HEAD 오른쪽)의 계정 아이콘·이름 + 메뉴 버튼 */
 
 .main-account {
@@ -2805,6 +3735,7 @@ body.has-trip-shell {
 
 #trip-modal-overlay .pick-btn--selected {
   background: var(--dday-pastel-bg);
+  color: #ffffff; /* 위 .pick-btn이 글자색을 같은 파스텔색으로 이미 정해둬서, 배경만 바꾸면 글자가 안 보였다 */
 }
 
 /* TRIP-SETUP: 선택된 도시 행의 강조 테두리·배경(연한 파란 틴트) */
@@ -3932,7 +4863,23 @@ body.has-trip-shell .toast {
 }
 
 .budget-header-text {
+  flex: 1 1 auto;
   min-width: 0;
+}
+
+/* [BUDGET-HEADER-ACTIONS] 총 지출/1/n 아이콘 두 개 - .mytrip-icon-btn/--dark를 그대로 재사용한다(SHELL
+   상단바와 같은 둥근 투명 아이콘 버튼), budget-header-text가 flex:1이라 자연히 우측에 붙는다. */
+.budget-header-actions {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.budget-icon-text {
+  font-size: 11px;
+  font-weight: 800;
+  letter-spacing: -0.02em;
 }
 
 .budget-title {
@@ -4121,6 +5068,175 @@ body.has-trip-shell .toast {
   font-size: 18px;
   font-weight: 800;
   font-variant-numeric: tabular-nums;
+}
+
+/* [BUDGET-TOTAL] 총 지출 아이콘(budget-header-actions)을 누르면 여는 카테고리별 분포 창 */
+
+.budget-total-modal {
+  max-width: 400px;
+}
+
+.budget-total-modal-amount {
+  margin: 0 0 var(--space-4);
+  color: var(--text-accent);
+  font-size: 22px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.budget-total-modal-subtitle {
+  margin: 0 0 var(--space-3);
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.budget-category-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  max-height: 320px;
+  overflow-y: auto;
+  list-style: none;
+}
+
+.budget-category-row-head {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-bottom: 6px;
+  font-size: 13px;
+}
+
+.budget-category-label {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-weight: 600;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.budget-category-amount {
+  flex-shrink: 0;
+  color: var(--text);
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+
+.budget-category-percent {
+  flex-shrink: 0;
+  width: 34px;
+  color: var(--text-muted);
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+}
+
+.budget-category-bar {
+  height: 6px;
+  border-radius: var(--radius-pill);
+  background: var(--surface-muted);
+  overflow: hidden;
+}
+
+/* 막대 채움색은 새 색을 만들지 않고 이미 있는 파스텔 블루 뱃지 색(--dday-pastel-bg)을 그대로 재사용한다 -
+   항목마다 다른 색이 필요한 다색 세트가 아니라 "채워진 정도"만 보여주는 장식 요소라서다. */
+.budget-category-bar-fill {
+  height: 100%;
+  border-radius: var(--radius-pill);
+  background: var(--dday-pastel-bg);
+}
+
+/* [BUDGET-SPLIT] 1/n 아이콘(budget-header-actions)을 누르면 여는 정산 내역 창 - 결제자/더치페이로 계산한
+   멤버별 받을 돈(+)/보낼 돈(-)을 보여준다. */
+
+.budget-split-modal {
+  max-width: 400px;
+}
+
+.budget-split-total-label {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-muted);
+}
+
+.budget-split-total-amount {
+  margin: 2px 0 var(--space-4);
+  color: var(--text-accent);
+  font-size: 20px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.budget-split-note {
+  margin: 0 0 var(--space-3);
+  color: var(--text-muted);
+  font-size: 13px;
+}
+
+.budget-split-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+.budget-split-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.budget-split-row:last-child {
+  border-bottom: none;
+}
+
+.budget-split-name {
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.budget-split-amount-wrap {
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+
+.budget-split-amount {
+  font-size: 15px;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+.budget-split-status {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* 받을 돈/보낼 돈은 새 색상 역할을 만들지 않고 CLAUDE.md 글자색 6역할의 블루/레드 계열을 그대로 쓴다 */
+.budget-split-amount--receive {
+  color: var(--text-accent);
+}
+
+.budget-split-amount--send {
+  color: var(--text-danger);
+}
+
+.budget-split-amount--even {
+  color: var(--text-muted);
 }
 
 /* [EXPENSE-FORM] 비용 추가 창 (budget-add-btn을 누르면 열린다) */
@@ -4543,7 +5659,7 @@ body.has-trip-shell .toast {
 }
 
 /* ==========================================================================
-   15. 여행지갑 (#/wallet)  [WALLET] [WALLET-FORM] [WALLET-VIEWER]
+   15. 여행지갑 (#/wallet/:id)  [WALLET] [WALLET-FORM] [WALLET-VIEWER]
    일정 화면의 QUICK-MENU에서 들어오는 개인 전체 문서함. 특정 여행에 매이지 않는다(:id 없음).
    화면 전체는 고정이고 .wallet-scroll만 스크롤된다. 그 안에 개인지갑/공유지갑 두 섹션이 위아래로 늘
    함께 보인다(탭 전환 없음). "+" 버튼은 화면에 고정된다.
@@ -5315,4 +6431,519 @@ body.has-trip-shell .toast {
 .trip-import-preview-remove:hover {
   background: var(--danger);
   color: #ffffff;
+}
+
+/* ==========================================================================
+   18. 관리 페이지 (/admin, SPA 밖 독립 페이지)  [ADMIN]
+   ========================================================================== */
+/* admin.html은 index.html의 해시 라우터 밖에 있는 별도 정적 페이지지만(naver-callback.html/
+   account-deletion.html과 같은 자리), 그 둘과 달리 이 파일을 그대로 불러와서 .wizard*/.pick-list/
+   .search-input/.btn* 등 기존 토큰·클래스를 재사용한다 — 관리자만 보는 내부 도구라 새 디자인을
+   만들 필요가 없다. 여기 추가하는 건 그 재사용만으로 부족한, admin 화면에만 있는 모양(탭 안 섹션
+   전환, 소식 카드 배지, 인기 여행지 순위 입력 줄)뿐이다. */
+
+body.admin-page {
+  background: var(--page-bg);
+  padding: var(--space-4);
+  max-width: 720px;
+  margin: 0 auto;
+}
+
+.admin-gate {
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+  color: var(--text-muted);
+}
+
+.admin-notfound {
+  padding: var(--space-6) var(--space-4);
+  text-align: center;
+}
+
+.admin-notfound h1 {
+  font-size: 20px;
+  color: var(--text-soft);
+  margin: 0 0 var(--space-2);
+}
+
+.admin-notfound p {
+  color: var(--text-muted);
+  margin: 0 0 var(--space-4);
+}
+
+.admin-notfound a {
+  color: var(--text-accent);
+}
+
+.admin-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  margin-bottom: var(--space-4);
+}
+
+.admin-header h1 {
+  font-size: 18px;
+  margin: 0;
+}
+
+.admin-header-user {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.admin-section {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.admin-form {
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  padding: var(--space-4);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.admin-form h2 {
+  font-size: 15px;
+  margin: 0 0 var(--space-3);
+}
+
+.admin-form-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0 var(--space-3);
+}
+
+.admin-form select {
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  font-size: 15px;
+  font-family: inherit;
+  background: var(--surface);
+  color: var(--text);
+}
+
+.admin-hint {
+  margin: 0 0 var(--space-2);
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.admin-char-count {
+  font-weight: 400;
+  color: var(--text-faint);
+}
+
+.admin-empty {
+  padding: var(--space-5) 0;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+
+.admin-feed-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 4px;
+}
+
+.admin-badge {
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+  background: var(--surface-muted);
+  color: var(--text-muted);
+}
+
+.admin-badge--importance-high {
+  background: var(--danger-pastel);
+  color: #ffffff;
+}
+
+.admin-badge--auto {
+  background: var(--text-accent);
+  color: #ffffff;
+}
+
+.admin-feed-meta {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.admin-feed-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.admin-ranking-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.admin-ranking-row {
+  align-items: flex-start;
+}
+
+.admin-ranking-rank {
+  flex-shrink: 0;
+  width: 36px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.admin-ranking-input-wrap {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+
+.admin-ranking-input-wrap .search-input {
+  margin-bottom: 0;
+}
+
+.admin-autocomplete-list {
+  position: absolute;
+  z-index: var(--z-drawer); /* admin.html엔 모달/알럿이 없어서 드롭다운이 그보다 낮은 이 토큰으로도 충분하다 */
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  max-height: 220px;
+  overflow-y: auto;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
+}
+
+.admin-autocomplete-list .pick-item {
+  cursor: pointer;
+  border: none;
+  border-radius: 0;
+}
+
+.admin-autocomplete-list .pick-item:hover {
+  background: var(--surface-muted);
+}
+
+.admin-ranking-country {
+  flex-shrink: 0;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.pick-item--active {
+  border-color: var(--accent);
+}
+
+/* 도시 이미지 탭 (discover_city_images 검토/게시) */
+.admin-city-preview-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-4);
+  margin: var(--space-3) 0;
+}
+
+.admin-city-card-preview-tile {
+  width: 160px;
+  aspect-ratio: 1 / 1;
+  border-radius: var(--radius-md);
+  overflow: hidden;
+  background: var(--surface-muted);
+}
+
+.admin-city-card-preview-tile img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.admin-city-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+  gap: var(--space-3);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.admin-city-image-card {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  background: var(--surface);
+}
+
+.admin-city-image-card--published {
+  border-color: var(--accent);
+  border-width: 2px;
+}
+
+.admin-city-image-card img {
+  width: 100%;
+  aspect-ratio: 1 / 1;
+  object-fit: cover;
+  border-radius: var(--radius-sm);
+  background: var(--surface-muted);
+}
+
+.admin-city-image-credit,
+.admin-city-image-source {
+  margin: 0;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.admin-city-image-actions {
+  display: flex;
+  gap: var(--space-2);
+  margin-top: 4px;
+}
+
+/* ==========================================================================
+   추천 도시 탭 (discover_cities 전체 관리 - 메인 화면 개선 단계 2 관리 페이지)
+   ========================================================================== */
+
+.admin-cities-toolbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.admin-check {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-soft);
+  cursor: pointer;
+}
+
+.admin-city-section {
+  margin: var(--space-5) 0;
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border);
+}
+
+.admin-city-section-title {
+  margin: 0 0 var(--space-3);
+  font-size: 16px;
+  font-weight: 800;
+}
+
+.admin-city-subsection-title {
+  margin: var(--space-4) 0 var(--space-2);
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-soft);
+}
+
+.admin-hint-inline {
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+/* 월별 점수 그리드 (요청 3번) */
+.admin-month-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: var(--space-3);
+  margin-bottom: var(--space-3);
+}
+
+.admin-month-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+}
+
+.admin-month-label {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-muted);
+}
+
+.admin-month-score {
+  width: 100%;
+}
+
+.admin-month-reason {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.admin-month-tag,
+.admin-month-text {
+  width: 100%;
+  font-size: 12px;
+}
+
+.admin-month-text {
+  resize: vertical;
+  min-height: 40px;
+}
+
+/* 미리보기 목록 (요청 6번) */
+.admin-preview-list {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.admin-preview-item {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.admin-preview-rank {
+  flex-shrink: 0;
+  width: 24px;
+  text-align: center;
+  font-weight: 800;
+  color: var(--text-faint);
+}
+
+.admin-preview-thumb {
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--surface-muted);
+}
+
+.admin-preview-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.admin-preview-fallback {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #ffffff;
+  font-weight: 800;
+}
+
+.admin-preview-info {
+  font-size: 13px;
+  color: var(--text-soft);
+}
+
+/* 하이라이트 편집 (요청 5번) */
+.admin-highlight-list {
+  list-style: none;
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.admin-highlight-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-2);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+}
+
+.admin-highlight-row-name {
+  flex: 1 1 140px;
+}
+
+.admin-highlight-row-summary {
+  flex: 2 1 220px;
+}
+
+.admin-highlight-row-actions {
+  display: flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.admin-highlight-row-actions button[data-action="up"],
+.admin-highlight-row-actions button[data-action="down"] {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  background: var(--surface);
+  cursor: pointer;
+}
+
+/* 빠른 검수(요청: 도시를 하나씩 안 들어가고 한 화면에서 쭉 훑어보기) - 도시 블록 사이 구분선 */
+.admin-quick-review-city {
+  padding: var(--space-4) 0;
+  border-bottom: 1px solid var(--border);
+}
+
+.admin-quick-review-city:first-child {
+  padding-top: 0;
+}
+
+@media (max-width: 400px) {
+  body.admin-page {
+    padding: var(--space-3);
+  }
+
+  /* 요청 7번: 딱 쓸 수 있을 정도로만 - 좁은 화면에서 한 줄짜리 입력행이 서로 눌리지 않게 세로로 쌓는다 */
+  .admin-highlight-row-name,
+  .admin-highlight-row-summary {
+    flex-basis: 100%;
+  }
+
+  .admin-month-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .admin-cities-toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }

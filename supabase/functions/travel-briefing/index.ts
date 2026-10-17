@@ -207,12 +207,17 @@ async function askGemini(prompt: string, apiKey: string, model: string): Promise
       .trim()
       .replace(/^```(?:json)?\s*/i, "")
       .replace(/\s*```$/, "");
-    return { value: JSON.parse(text), retry: false };
+    // google_search 도구를 쓰면(response_schema를 못 써서 프롬프트 지시만으로 JSON을 받는다 - 맨 위 주석
+    // 참고) 모델이 지시를 어기고 JSON 앞뒤에 안내 문구나 출처 각주를 붙이는 일이 흔하다. 전체 문자열이
+    // 아니라 그 안의 첫 {...} 블록만 잘라내 관용적으로 파싱한다.
+    const jsonMatch = text.match(/\{[\s\S]*\}/);
+    return { value: JSON.parse(jsonMatch ? jsonMatch[0] : text), retry: false };
   } catch (err) {
-    // 시간 초과(AbortError)나 네트워크 오류는 다른 모델로 다시 해 볼 수 있다. JSON을 읽지 못한 경우는 그대로 실패로 본다.
+    // 시간 초과(AbortError)나 네트워크 오류, 그리고 JSON을 못 읽은 경우(SyntaxError - 위 설명대로 검색 도구를
+    // 쓰면 모델이 가끔 지시를 어긴다) 모두 다른 모델로 다시 시도해 볼 수 있다.
     const name = err instanceof Error ? err.name : "unknown";
     console.error("[travel-briefing] Gemini 호출·해석 실패", model, name);
-    return { value: null, retry: name === "AbortError" || name === "TypeError" };
+    return { value: null, retry: name === "AbortError" || name === "TypeError" || name === "SyntaxError" };
   } finally {
     clearTimeout(timer);
   }

@@ -223,10 +223,13 @@
 
   // ---- 통화 드롭다운 (5-1) ----
 
-  // PRD 5-1: 원화·달러·여행지 통화 (여행지 통화가 원화·달러와 겹치면 제외). 여행지는 trip.destination
-  // ("도쿄, 일본"처럼 "<도시>, <나라>")의 콤마 뒤 나라 이름으로 찾는다.
+  // PRD 5-1: 원화·달러·여행지 통화 (여행지 통화가 원화·달러와 겹치면 제외). destinationId가 있는(PRD v12
+  // 이후) 여행은 이미 확정해 둔 trip.currency(ISO 코드)를 그대로 쓴다 - destination 문자열 나라 이름을
+  // 13개국 표와 맞춰보는 옛 방식(getCurrencyOptions)은 새로 늘어난 도시 대부분을 못 찾기 때문이다. 국내·
+  // 옛 방식 여행은 여전히 destination("도쿄, 일본"처럼 "<도시>, <나라>")의 콤마 뒤 나라 이름으로 찾는다.
   function currencyOptions() {
     const country = (state.trip?.destination ?? "").split(",").pop()?.trim();
+    if (state.trip?.destinationId) return currencyData.getCurrencyOptionsByCode(state.trip.currency, country);
     return currencyData.getCurrencyOptions(country);
   }
 

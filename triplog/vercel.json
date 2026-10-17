@@ -5,7 +5,8 @@
   "installCommand": null,
   "rewrites": [
     { "source": "/auth/naver-callback", "destination": "/auth/naver-callback.html" },
-    { "source": "/account-deletion", "destination": "/account-deletion.html" }
+    { "source": "/account-deletion", "destination": "/account-deletion.html" },
+    { "source": "/admin", "destination": "/admin.html" }
   ],
   "headers": [
     {
@@ -15,6 +16,10 @@
     {
       "source": "/img/(.*)",
       "headers": [{ "key": "Cache-Control", "value": "public, max-age=86400" }]
+    },
+    {
+      "source": "/sw.js",
+      "headers": [{ "key": "Cache-Control", "value": "no-cache" }]
     }
   ]
 }

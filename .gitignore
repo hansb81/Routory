@@ -5,3 +5,6 @@ __pycache__/
 .claude/scheduled_tasks.lock
 supabase/.temp/
 supabase/supabase/
+triplog/js/config.js
+.serena/
+CLAUDE.zip

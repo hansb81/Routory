@@ -4,13 +4,17 @@
 // 라우트가 화면 하나에 대응하고, 화면 전환은 해당 화면의 DOM만 보이게(hidden 해제) 하는 방식이다.
 //
 //   #/main             메인
+//   #/past-trips       지난 여행 (MAIN-MENU의 "지난 여행"에서 들어온다, mainPage.js)
+//   #/travel-feed      여행 소식 전체 목록 (메인 화면 '여행 소식'의 "더보기", travelFeed.js). ?kind=safety|benefit&scope=domestic|overseas
+//   #/discover-city/:id 도시 정보 (메인 화면 '어디로 떠나볼까요?' 카드를 누르면 온다, travelFeed.js). 여행을
+//                      바로 만들지 않는 순수 정보 화면 - get_city_detail(id) 하나로 전부 그린다.
 //   #/my-trip/:id      나의 여행 (지금은 빈 화면 — 상단바·하단탭바·메뉴는 tripShell.js가 그린다)
 //   #/schedule/:id     일정 타임라인 (index.html에 이미 있는 화면)
 //   #/login            로그인 (구글/카카오 소셜 로그인). #/login?redirect=/경로 로 열면 로그인 뒤 그 경로로 돌아간다
 //   #/consent          약관 동의 (로그인은 했지만 user_consents 행이 아직 없는 사용자만 거친다, consentPage.js)
 //   #/invite/:code     초대 링크로 여행에 참여
 //   #/budget/:id       가계부
-//   #/wallet           여행지갑 (특정 여행에 매이지 않는 개인 전체 문서함)
+//   #/wallet/:id       여행지갑 (이 여행에 올린 문서만 보여준다 — 개인지갑도 공유지갑도 여행별로 따로 쌓인다)
 //   #/lodging/:id      숙소 추가 (일정 화면의 QUICK-MENU "+ 숙소"에서 들어온다)
 //   #/notifications    알림 (MAIN-MENU·SHELL MYTRIP-MENU 공용, commonPages.js)
 //   #/settings         설정 (위와 같은 공용 화면)
@@ -30,13 +34,16 @@
 
   const ROUTES = [
     { name: "main", path: "/main", title: "메인" },
+    { name: "past-trips", path: "/past-trips", title: "지난 여행" }, // MAIN-MENU의 "지난 여행"에서 들어온다 (mainPage.js)
+    { name: "travel-feed", path: "/travel-feed", title: "여행 소식" }, // 메인 화면 '여행 소식' 영역의 "더보기" (travelFeed.js). ?kind=safety|benefit&scope=domestic|overseas 쿼리로 들어온다
+    { name: "discover-city", path: "/discover-city/:id", title: "도시 정보" }, // '어디로 떠나볼까요?' 카드 (travelFeed.js) - 여행 만들기로 바로 가지 않는 정보 화면
     { name: "my-trip", path: "/my-trip/:id", title: "나의 여행" },
     { name: "schedule", path: "/schedule/:id", title: "일정" },
     { name: "login", path: "/login", title: "로그인" },
     { name: "consent", path: "/consent", title: "약관 동의" }, // 로그인은 했지만 아직 동의하지 않은 사용자만 거친다 (consentPage.js)
     { name: "invite", path: "/invite/:code", title: "초대" },
     { name: "budget", path: "/budget/:id", title: "가계부" },
-    { name: "wallet", path: "/wallet", title: "여행지갑" }, // 특정 여행에 매이지 않는 개인 전체 문서함이라 :id가 없다
+    { name: "wallet", path: "/wallet/:id", title: "여행지갑" }, // 여행별로 따로 쌓이므로 다른 셸 화면들과 같은 :id가 있다
     { name: "lodging", path: "/lodging/:id", title: "숙소" },
     { name: "notifications", path: "/notifications", title: "알림" }, // MAIN-MENU·SHELL의 MYTRIP-MENU 양쪽에서 여는 공용 화면 (commonPages.js)
     { name: "settings", path: "/settings", title: "설정" }, // 위와 같은 공용 화면 쌍
@@ -51,6 +58,9 @@
   // 화면(라우트)별 별칭: comments.html 참고
   const PAGE_ALIASES = {
     main: "MAIN · 메인 화면",
+    "past-trips": "PAST-TRIPS · 지난 여행 화면",
+    "travel-feed": "TRAVEL-FEED-PAGE · 여행 소식 전체 목록 화면",
+    "discover-city": "DISCOVER-CITY · 도시 정보 화면",
     "my-trip": "MYTRIP · 나의 여행 화면",
     login: "LOGIN · 로그인 화면",
     consent: "CONSENT · 약관 동의 화면",

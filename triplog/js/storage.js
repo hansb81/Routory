@@ -20,6 +20,8 @@
 // user_consents(010_user_consents.sql, 사용자당 한 행)도 같은 "동기 읽기 + 비동기 refresh" 모양을 따른다:
 // refreshConsent()가 로그인한 사용자의 행을 받아 캐시하고, hasConsent()가 그 캐시를 동기로 돌려준다
 // (app.js의 라우터 가드가 동기 함수만 쓸 수 있어서다) - consentPage.js/app.js 참고.
+// notification_settings(031_push_notifications.sql, 사용자당 한 행)도 같은 모양(loadNotificationSettings/
+// getNotificationSettings/saveNotificationSettings) - commonPages.js의 설정 화면 "알림" 섹션 참고.
 
 (function () {
   const supabase = window.TripLog.supabase;
@@ -39,9 +41,15 @@
   const expensesLoadedTrips = new Set(); // 지출을 불러온 여행 id
   const expensesRequestIds = new Map();
   const itemsRequestIds = new Map();
+  let walletItemsCache = []; // 불러온 여행들의 지갑 문서 (item.tripId로 구분, expensesCache와 같은 모양)
+  const walletItemsLoadedTrips = new Set(); // 지갑 문서를 불러온 여행 id
+  const walletItemsRequestIds = new Map();
   let consentCache = null; // 로그인한 사용자의 user_consents 행 (없으면 null - 아직 한 번도 동의하지 않았다는 뜻)
   let consentLoaded = false; // 서버에 한 번이라도 성공적으로 확인했는가 (hasConsent()의 기본값을 가르는 플래그, 아래 참고)
   let consentRequestId = 0;
+  let notificationSettingsCache = { scheduleEnabled: true, shareEnabled: true }; // 행이 없으면 기본값(켜짐) - 031_push_notifications.sql의 컬럼 기본값과 같다
+  let notificationSettingsLoaded = false;
+  let notificationSettingsRequestId = 0;
 
   // 지금 보고 있는 여행의 id. 화면(라우트)이 정하며 저장하지 않는다. getTrip()이 이 여행을 돌려준다.
   let currentTripId = null;
@@ -126,6 +134,11 @@
       title: row.title,
       destination: row.destination ?? "",
       cityId: row.city_id ?? undefined,
+      destinationId: row.destination_id ?? undefined,
+      timezone: row.timezone ?? undefined,
+      lat: typeof row.lat === "number" ? row.lat : undefined,
+      lng: typeof row.lng === "number" ? row.lng : undefined,
+      currency: row.currency ?? undefined,
       startDate: row.start_date,
       endDate: row.end_date,
       createdAt: row.created_at,
@@ -155,6 +168,7 @@
       item.flightNo = row.flight_no ?? row.flight.flightNo ?? null;
     }
     if (row.lodging) item.lodging = row.lodging;
+    if (row.transport) item.transport = row.transport; // 기차/버스/선박/기타 (013_transport_items.sql), transportForm.js가 읽고 쓴다
     // time: 시간 입력 기능(schedule.js#field-time)이 실제로 쓰는 컬럼 — "HH:MM:SS"(Postgres time 타입)로 온다.
     // title: 예전 버전이 남긴 필드 (renderItemCard가 place 없을 때의 대체값으로 쓴다)
     if (row.title) item.title = row.title;
@@ -203,9 +217,9 @@
     expensesCache = [];
     expensesLoadedTrips.clear();
     expensesRequestIds.clear();
-    walletItemsCache = null;
-    walletItemsLoaded = false;
-    walletItemsRequestId += 1;
+    walletItemsCache = [];
+    walletItemsLoadedTrips.clear();
+    walletItemsRequestIds.clear();
     consentCache = null;
     consentLoaded = false;
     consentRequestId += 1;
@@ -287,7 +301,10 @@
   }
 
   // 새 여행을 저장한다. 만든 사람(owner_id)을 함께 저장하고, 서버 트리거가 그 사람을 trip_members에 owner로 넣는다.
-  async function createTrip({ title, destination, cityId, startDate, endDate }) {
+  // destinationId/timezone/lat/lng/currency는 PRD v12(여행지 확장) 이후 해외 도시를 고르면 같이 오는 값 -
+  // 없으면(국내, 또는 옛 방식) null로 둔다. destination/cityId(문자열) 필드는 그대로 같이 채워서 기존
+  // 기능이 안 깨지게 한다.
+  async function createTrip({ title, destination, cityId, destinationId, timezone, lat, lng, currency, startDate, endDate }) {
     const userId = requireUserId();
     const { data, error } = await supabase
       .from("trips")
@@ -296,6 +313,11 @@
         title,
         destination,
         city_id: cityId ?? null,
+        destination_id: destinationId ?? null,
+        timezone: timezone ?? null,
+        lat: lat ?? null,
+        lng: lng ?? null,
+        currency: currency ?? null,
         start_date: startDate,
         end_date: endDate,
       })
@@ -319,6 +341,11 @@
         title: trip.title,
         destination: trip.destination,
         city_id: trip.cityId ?? null,
+        destination_id: trip.destinationId ?? null,
+        timezone: trip.timezone ?? null,
+        lat: trip.lat ?? null,
+        lng: trip.lng ?? null,
+        currency: trip.currency ?? null,
         start_date: trip.startDate,
         end_date: trip.endDate,
       })
@@ -334,10 +361,23 @@
   }
 
   // 여행을 지운다 (서버에서 그 여행의 일정·초대·멤버도 함께 지워진다). RLS상 여행을 만든 사람(owner)만 지울 수 있다.
+  // 019_wallet_trip_required.sql부터 wallet_items.trip_id가 cascade라서, 이 여행에 연결된 지갑 문서 행도
+  // (다른 멤버가 올린 것까지 포함해) 서버에서 함께 지워진다 — 하지만 Storage의 실제 파일은 FK cascade가
+  // 닿지 않는 별도 영역이라 따로 지워야 한다. 그중 "내가 올린 파일"만은 지우기 전에 미리 목록을 받아 두고
+  // (트립 행이 지워지면 그 wallet_items 행도 같이 지워져서 나중엔 경로를 알 수 없다) best-effort로 지운다 -
+  // 다른 멤버가 올린 개인 문서의 파일까지는 내 권한(Storage RLS)으로 지울 수 없어 고아로 남을 수 있다
+  // (delete-account 함수의 "DB 행 삭제가 기준, Storage 정리는 best-effort" 원칙과 같다).
   async function deleteTrip(id) {
+    const userId = requireUserId();
+    const { data: myWalletFiles } = await supabase.from("wallet_items").select("file_url").eq("trip_id", id).eq("user_id", userId);
+
     const { data, error } = await supabase.from("trips").delete().eq("id", id).select("id");
     if (error) throw fail(error, "여행 삭제");
     if (!data || data.length === 0) throw new Error("여행을 삭제하지 못했어요. 여행을 만든 사람만 삭제할 수 있어요.");
+
+    if (myWalletFiles?.length) {
+      await supabase.storage.from("wallet").remove(myWalletFiles.map((row) => row.file_url)).catch(() => {});
+    }
 
     tripsCache = tripsCache.filter((t) => t.id !== id);
     for (const item of itemsCache) if (item.tripId === id) writeImageIds(item.id, []);
@@ -347,6 +387,9 @@
     expensesCache = expensesCache.filter((expense) => expense.tripId !== id);
     expensesLoadedTrips.delete(id);
     expensesRequestIds.delete(id);
+    walletItemsCache = walletItemsCache.filter((item) => item.tripId !== id);
+    walletItemsLoadedTrips.delete(id);
+    walletItemsRequestIds.delete(id);
     if (currentTripId === id) currentTripId = null;
     notify();
   }
@@ -521,7 +564,7 @@
     return error?.code === "PGRST204" || error?.code === "42703";
   }
 
-  async function addItem({ tripId, date, time, place, lat, lng, memo, images, flight, lodging }) {
+  async function addItem({ tripId, date, time, place, lat, lng, memo, images, flight, lodging, transport }) {
     if (!tripId) throw new Error("일정을 넣을 여행을 찾을 수 없어요.");
     requireUserId();
 
@@ -539,6 +582,9 @@
       lodging: lodging ?? null,
       ...flightColumns(flight),
     };
+    // transport(기타 교통편, 013_transport_items.sql)는 flight/lodging과 달리 처음부터 있던 컬럼이 아니라서,
+    // 그 마이그레이션을 아직 돌리지 않은 서버에서도 일반 일정 추가가 깨지지 않도록 값이 있을 때만 키를 넣는다.
+    if (transport) row.transport = transport;
 
     let { data, error } = await supabase.from("schedule_items").insert({ ...row, sort_order: nextOrder }).select().single();
     if (error && isMissingColumn(error)) {
@@ -570,6 +616,7 @@
       Object.assign(columns, flightColumns(patch.flight));
     }
     if ("lodging" in patch) columns.lodging = patch.lodging ?? null;
+    if ("transport" in patch) columns.transport = patch.transport ?? null;
     if ("sortOrder" in patch) columns.sort_order = patch.sortOrder;
 
     const { data, error } = await supabase.from("schedule_items").update(columns).eq("id", id).select();
@@ -640,32 +687,26 @@
 
   // ---- 여행지갑(Wallet) ----
   // 개인지갑(나만 보임)/공유지갑(그 문서에 연결한 여행의 멤버도 보임)으로 나뉜다 (007_wallet_shared.sql).
-  // loadWalletItems가 서버에서 실제 목록을 받는다: RLS가 "본인 것 + 내가 멤버인 여행에 공유된 것"만
-  // 돌려주므로 한 번의 select로 두 지갑을 함께 채울 수 있다 (refreshTrips와 같은 방식 — 사용자가 한
-  // 번에 볼 수 있는 전체 목록이라 여행별로 나눠 부르지 않는다). addWalletItem은 업로드에 성공하면 그
-  // 결과를 같은 캐시에 바로 쌓는다(addItem/addExpense와 같은 방식). 계정이 바뀌면(clearCache) 캐시와
-  // "받아 온 적 있음" 표시를 함께 지운다 — 다른 사람이 올린 항목이 남아 있으면 안 되기 때문이다.
-  let walletItemsCache = null;
-  let walletItemsLoaded = false; // 서버에서 지갑 목록을 한 번이라도 받았는가
-  let walletItemsRequestId = 0; // 늦게 도착한 응답이 새 응답이나 다른 사용자의 캐시를 덮어쓰지 않게 하는 번호
-
-  function ensureWalletItemsCache() {
-    if (!walletItemsCache) walletItemsCache = [];
-  }
+  // 019_wallet_trip_required.sql부터 두 지갑 모두 반드시 어느 여행에 연결되어야 한다 - 개인 문서(여권 등)도
+  // "다른 여행과 공통으로 쓰는 보관함"이 아니라 그 여행의 개인지갑에만 쌓인다. 그래서 캐시 모양도 더 이상
+  // "내가 볼 수 있는 전체 목록 하나"가 아니라 expensesCache와 똑같이 여행별로 나눠 부르고 합쳐 쓴다
+  // (loadWalletItems(tripId)/isWalletItemsLoaded(tripId); getWalletItems()는 지금까지 불러온 모든 여행의
+  // 항목을 한 배열로 돌려주고, walletPage.js가 trip.id로 걸러 쓴다 - budgetPage.js#getExpenses가 쓰는 방식).
+  // addWalletItem은 업로드에 성공하면 그 결과를 같은 캐시에 바로 쌓는다(addItem/addExpense와 같은 방식).
+  // 계정이 바뀌면(clearCache) 캐시와 "받아 온 적 있음" 표시를 함께 지운다.
 
   function getWalletItems() {
-    ensureWalletItemsCache();
     return walletItemsCache;
   }
 
-  const isWalletItemsLoaded = () => walletItemsLoaded;
+  const isWalletItemsLoaded = (tripId) => walletItemsLoadedTrips.has(tripId);
 
   // wallet_items 행 → 화면이 쓰는 지갑 항목 객체
   function rowToWalletItem(row) {
     return {
       id: row.id,
       userId: row.user_id,
-      tripId: row.trip_id ?? null,
+      tripId: row.trip_id,
       category: row.category,
       title: row.title,
       description: row.description ?? null,
@@ -676,17 +717,24 @@
     };
   }
 
-  // 내 지갑 목록을 서버에서 다시 받아 캐시를 통째로 바꾼다 (개인 것 + 공유지갑으로 나와 공유된 것, RLS가 걸러 준다).
-  async function loadWalletItems() {
-    const requestId = ++walletItemsRequestId;
+  // 이 여행의 지갑 목록을 서버에서 다시 받는다 (개인 것 + 공유지갑으로 나와 공유된 것, RLS가 걸러 준다).
+  // loadExpenses와 같은 모양: 그 여행 몫만 캐시에서 들어냈다가 새로 받은 것으로 채워 넣는다.
+  async function loadWalletItems(tripId) {
+    if (!tripId) return [];
+    const requestId = (walletItemsRequestIds.get(tripId) ?? 0) + 1;
+    walletItemsRequestIds.set(tripId, requestId);
     const ownerAtStart = cacheUserId;
 
-    const { data, error } = await supabase.from("wallet_items").select("*").order("created_at", { ascending: false });
+    const { data, error } = await supabase
+      .from("wallet_items")
+      .select("*")
+      .eq("trip_id", tripId)
+      .order("created_at", { ascending: false });
     if (error) throw fail(error, "지갑 목록 불러오기");
-    if (requestId !== walletItemsRequestId || ownerAtStart !== cacheUserId) return getWalletItems(); // 더 새로운 요청이나 로그아웃이 있었다
+    if (walletItemsRequestIds.get(tripId) !== requestId || ownerAtStart !== cacheUserId) return getWalletItems(); // 더 새로운 요청이나 로그아웃이 있었다
 
-    walletItemsCache = (data ?? []).map(rowToWalletItem);
-    walletItemsLoaded = true;
+    walletItemsCache = [...walletItemsCache.filter((item) => item.tripId !== tripId), ...(data ?? []).map(rowToWalletItem)];
+    walletItemsLoadedTrips.add(tripId);
     return getWalletItems();
   }
 
@@ -694,13 +742,12 @@
   // 미리 한다 — storage.js는 통화·카테고리를 몰라도 되는 얇은 저장 계층이라는 원칙을 그대로 따른다.
   // 파일 이름의 한글·공백 등은 Storage 경로에 안전한 문자만 남기고, "{uid}/{시각}_{파일명}"으로 저장한다
   // (경로 첫 조각이 내 uid와 같아야 하는 006_wallet.sql의 Storage 정책과 맞아야 한다).
-  // visibility가 "shared"면 tripId가 있어야 한다(007의 check 제약과 같은 규칙 — 어느 여행 멤버와 공유할지
-  // 몰라서는 안 되므로 여기서도 미리 막는다); "personal"이면 tripId는 무시하고 항상 null로 저장한다.
+  // tripId는 개인지갑/공유지갑 모두 필수다(019_wallet_trip_required.sql) - "어느 여행의 문서인지"가 둘 다
+  // 있어야 여행별로 따로 쌓일 수 있기 때문이다.
   async function addWalletItem({ file, category, title, description, visibility, tripId }) {
     const userId = requireUserId();
+    if (!tripId) throw new Error("문서를 올릴 여행을 찾을 수 없어요.");
     const vis = visibility === "shared" ? "shared" : "personal";
-    if (vis === "shared" && !tripId) throw new Error("공유지갑에 올리려면 여행을 선택해야 해요.");
-    const finalTripId = vis === "shared" ? tripId : null;
 
     const fileType = file.type?.startsWith("image/") ? "image" : "pdf";
     const safeName = file.name.replace(/[^A-Za-z0-9._-]/g, "_") || "file";
@@ -713,7 +760,7 @@
       .from("wallet_items")
       .insert({
         user_id: userId,
-        trip_id: finalTripId,
+        trip_id: tripId,
         category,
         title,
         description: description || null,
@@ -730,7 +777,6 @@
     }
 
     const item = rowToWalletItem(data);
-    ensureWalletItemsCache();
     walletItemsCache.push(item);
     return item;
   }
@@ -759,7 +805,7 @@
     const { error: removeError } = await supabase.storage.from("wallet").remove([item.fileUrl]);
     if (removeError) console.warn("[storage] Storage 파일 삭제 실패 (문서 기록은 이미 지워졌어요)", removeError);
 
-    if (walletItemsCache) walletItemsCache = walletItemsCache.filter((x) => x.id !== item.id);
+    walletItemsCache = walletItemsCache.filter((x) => x.id !== item.id);
   }
 
   // ---- 약관 동의(user_consents, 010_user_consents.sql) ----
@@ -840,6 +886,59 @@
     return consentCache;
   }
 
+  // ---- 알림 설정(notification_settings, 031_push_notifications.sql, 사용자당 한 행) ----
+  // 설정 화면의 "일정 알림"/"초대·공유 알림" 두 토글만 저장한다(공지사항은 끄는 설정이 없다 - PRD v11
+  // 5번). 한 번도 저장한 적 없는 사용자는 행이 없는데, 그때는 DB 컬럼 기본값과 같은 '켜짐'으로 보여준다.
+
+  function rowToNotificationSettings(row) {
+    return {
+      scheduleEnabled: row ? Boolean(row.schedule_enabled) : true,
+      shareEnabled: row ? Boolean(row.share_enabled) : true,
+    };
+  }
+
+  // 로그인한 사용자의 notification_settings 행을 서버에서 다시 확인해 캐시한다. 행이 없거나(아직 저장
+  // 안 함) 로그인하지 않았으면 기본값(둘 다 켜짐)으로 캐시한다. 네트워크 오류 등으로 실패해도 던지지
+  // 않는다 - 직전 캐시(또는 기본값)를 그대로 돌려준다.
+  async function loadNotificationSettings() {
+    const userId = auth?.getUserId() ?? null;
+    if (!userId) {
+      notificationSettingsCache = { scheduleEnabled: true, shareEnabled: true };
+      notificationSettingsLoaded = false;
+      return notificationSettingsCache;
+    }
+    const requestId = ++notificationSettingsRequestId;
+    const { data, error } = await supabase.from("notification_settings").select("*").eq("user_id", userId).maybeSingle();
+    if (requestId !== notificationSettingsRequestId) return notificationSettingsCache; // 더 새로운 요청이나 로그아웃이 있었다
+    if (error) {
+      console.warn("[storage] 알림 설정 조회 실패", error);
+      return notificationSettingsCache;
+    }
+    notificationSettingsCache = rowToNotificationSettings(data);
+    notificationSettingsLoaded = true;
+    return notificationSettingsCache;
+  }
+
+  function getNotificationSettings() {
+    return notificationSettingsCache;
+  }
+
+  // user_id가 PK라서 upsert 한 번으로 "최초 저장"과 "변경"을 모두 처리한다(user_consents와 같은 모양).
+  async function saveNotificationSettings({ scheduleEnabled, shareEnabled }) {
+    const userId = requireUserId();
+    const row = {
+      user_id: userId,
+      schedule_enabled: Boolean(scheduleEnabled),
+      share_enabled: Boolean(shareEnabled),
+    };
+    const { data, error } = await supabase.from("notification_settings").upsert(row, { onConflict: "user_id" }).select().single();
+    if (error) throw fail(error, "알림 설정 저장");
+
+    notificationSettingsCache = rowToNotificationSettings(data);
+    notificationSettingsLoaded = true;
+    return notificationSettingsCache;
+  }
+
   // 로그인 기능이 없던 때 저장해 둔 가짜(mock) 사용자는 이제 쓰지 않는다. 진짜 로그인 상태는 Supabase 세션이 정한다 (auth.js).
   try {
     localStorage.removeItem("triplog.user");
@@ -888,5 +987,8 @@
     hasConsent,
     getConsent,
     saveConsent,
+    loadNotificationSettings,
+    getNotificationSettings,
+    saveNotificationSettings,
   };
 })();

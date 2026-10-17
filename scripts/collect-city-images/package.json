@@ -1,0 +1,14 @@
+{
+  "name": "collect-city-images",
+  "version": "1.0.0",
+  "private": true,
+  "description": "로컬에서 수동으로 실행하는 '어디로 떠나볼까요' 도시 대표 이미지 후보 수집 스크립트 (triplog 앱 번들과 별개).",
+  "type": "module",
+  "scripts": {
+    "collect": "node collect.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4",
+    "sharp": "^0.33.5"
+  }
+}

@@ -77,8 +77,9 @@
   };
 
   // 새 항공편을 추가할 때 실제로 거치는 화면 순서. 수정할 때나 선택 화면(choice)에 있을 때는 이 목록을 안 쓴다.
-  // 교통편(항공/기차/버스/선박) 고르기는 이 모듈에 들어오기 전, 일정 화면의 빠른 메뉴 드롭다운에서 이미
+  // 교통편(항공/기타) 고르기는 이 모듈에 들어오기 전, 일정 화면의 빠른 메뉴 드롭다운에서 이미
   // 끝난 상태다(app.js#openTransportMenu) - "항공"을 골랐을 때만 flight.openForm()이 불려서 여기로 온다.
+  // "기타"(기차/버스/선박/기타)는 transportForm.js가 따로 맡는다.
   function stepsFor() {
     if (state.editingId) return ["day", "airline", "confirm"];
     if (state.path === "manual") return ["day", "airline", "confirm"];

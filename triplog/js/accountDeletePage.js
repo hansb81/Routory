@@ -129,6 +129,13 @@
     okBtn.disabled = true;
     okBtn.textContent = "탈퇴하는 중...";
 
+    // 탈퇴 처리 직전에 이 기기/브라우저의 푸시 토큰(또는 구독) 행을 지운다 - 로그아웃(commonPages.js)과
+    // 같은 이유. delete-account 자체도 계정이 실제로 삭제되면 031의 auth.users FK on delete cascade로
+    // device_tokens 행은 결국 지워지지만, 웹은 실제 브라우저 구독(unsubscribe)까지 끊어야 해서 DB 행
+    // cascade만으로는 부족하다 - 둘 다 실패해도 조용히 넘어가고 탈퇴 흐름을 막지 않는다.
+    await window.TripLog.pushNotifications?.removeDeviceToken?.();
+    await window.TripLog.webPush?.unsubscribeAndRemove?.();
+
     try {
       const { data, error } = await supabase.functions.invoke("delete-account");
       if (error || data?.error) throw new Error(data?.error || error.message);

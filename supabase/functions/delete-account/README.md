@@ -31,7 +31,7 @@
 | --- | --- |
 | 401 | 로그인 토큰이 없거나 이상함(anon 키만으로 부른 경우 등) |
 | 405 | POST가 아님 |
-| 500 | 이 함수의 설정(비밀값) 또는 아래 8단계 중 하나가 실패함 — `error` 메시지에 어느 단계인지 담겨 있습니다 |
+| 500 | 이 함수의 설정(비밀값) 또는 아래 12단계 중 하나가 실패함 — `error` 메시지에 어느 단계인지 담겨 있습니다 |
 
 **클라이언트는 이 `error` 메시지를 사람에게 그대로 보여주지 않습니다.** `accountDeletePage.js`는 실패
 원인과 무관하게 항상 "탈퇴 처리 중 문제가 발생했습니다. 고객센터로 문의해주세요."만 보여주고, 이 함수가
@@ -59,12 +59,17 @@
    5번의 `trip_id` cascade로 이미 다 지워져 있습니다 — 혹시 남은 게 있으면 마저 지웁니다(멱등 — 없는
    행을 지워도 오류가 아닙니다).
 7. **`user_consents`** (`user_id` = 나) — 약관 동의 기록.
-8. **`auth.admin.deleteUser(나)`** — Auth 계정 자체를 지웁니다. 1~7번을 이미 다 지웠으므로 이 시점엔
-   외래키 제약에 걸릴 행이 없어야 정상입니다.
+8. **`device_tokens`** (`user_id` = 나) — 이 계정이 등록해 둔 모든 기기의 푸시 토큰(안드로이드 FCM 토큰 +
+   웹 구독 정보).
+9. **`notification_settings`** (`user_id` = 나) — 알림 종류별 on/off 설정.
+10. **`notifications`** (`user_id` = 나) — 인앱 알림 발송 기록.
+11. **`notification_log`** (`user_id` = 나) — 중복 발송 방지 로그.
+12. **`auth.admin.deleteUser(나)`** — Auth 계정 자체를 지웁니다. 1~11번을 이미 다 지웠으므로 이 시점엔
+    외래키 제약에 걸릴 행이 없어야 정상입니다.
 
 ## 트랜잭션이 아닙니다 — 그리고 그래도 안전한 이유
 
-이 8단계는 하나의 Postgres 트랜잭션으로 묶여 있지 않습니다(그렇게 하려면 이 모든 작업을 수행하는 Postgres
+이 12단계는 하나의 Postgres 트랜잭션으로 묶여 있지 않습니다(그렇게 하려면 이 모든 작업을 수행하는 Postgres
 함수(RPC)를 따로 만들어야 하는데, 이번 요청 범위에서는 만들지 않았습니다). 그래서 중간 단계가 실패하면 그
 앞 단계까지는 이미 지워진 채로 멈출 수 있습니다.
 
@@ -76,9 +81,11 @@
 ## `ON DELETE CASCADE`로도 같은 결과가 나오도록 스키마도 맞췄습니다
 
 `011_delete_account_cascades.sql`이 `trips.owner_id`/`schedule_items.created_by`/`expenses.created_by`/
-`trip_invites.created_by`의 `on delete` 규칙을 `cascade`로 바꿔 둡니다. 이 함수가 위 1~7번을 이미
-명시적으로 먼저 지우므로 8번(`deleteUser`) 시점엔 사실 아무것도 안 걸리지만, 이 마이그레이션은 **안전망**
-입니다:
+`trip_invites.created_by`의 `on delete` 규칙을 `cascade`로 바꿔 둡니다. `device_tokens`/
+`notification_settings`/`notifications`/`notification_log` 네 테이블은 `031_push_notifications.sql`이
+처음부터 `auth.users`에 `on delete cascade`로 선언해 뒀습니다(뒤늦게 추가된 안전망이 아니라 설계
+시점부터 cascade였다는 차이만 있습니다). 이 함수가 위 1~11번을 이미 명시적으로 먼저 지우므로
+12번(`deleteUser`) 시점엔 사실 아무것도 안 걸리지만, 이 cascade들은 **안전망**입니다:
 
 - 혹시 위 단계 중 하나가 코드 변경으로 빠지거나, 경쟁 상태로 그 사이 새 행이 생겨도 `deleteUser` 자체가
   외래키 오류 없이 끝납니다.

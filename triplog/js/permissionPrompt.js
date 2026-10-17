@@ -95,6 +95,77 @@
     el.hidden = false;
   }
 
+  // ---- 알림 권한 안내 모달 (설정 화면 "알림 켜기") ----
+  // 카메라와 같은 이유로 OS 알림 권한 팝업 전에 먼저 이유를 보여준다. 다만 "이미 거부됨"과 "iOS Safari
+  // 일반 탭(홈 화면에 추가 안 함)" 두 경우는 commonPages.js가 이 모달을 아예 열지 않고 버튼 자체를 안내
+  // 문구로 바꿔 버린다 - 그래서 이 모달은 "아직 묻지 않음/모름" 상태에서만 열린다.
+  const NOTIFICATION_MESSAGE = "출발 전날과 일정 시작 전, 여행 멤버 변화를 알려드리려면 알림 권한이 필요해요.";
+
+  let notificationOverlay = null;
+
+  function ensureNotificationOverlay() {
+    if (notificationOverlay) return notificationOverlay;
+    notificationOverlay = document.createElement("div");
+    notificationOverlay.className = "modal-overlay";
+    notificationOverlay.dataset.alias = "NOTIFICATION-PERMISSION-CONFIRM · 알림 권한 안내";
+    notificationOverlay.hidden = true;
+    notificationOverlay.innerHTML = `
+      <div class="modal modal-confirm" role="alertdialog" aria-modal="true" aria-labelledby="notification-permission-title">
+        <h2 class="modal-title" id="notification-permission-title">알림을 받아보세요</h2>
+        <p class="trip-exit-note">${NOTIFICATION_MESSAGE}</p>
+        <div class="modal-actions">
+          <div class="modal-actions-right">
+            <button type="button" class="btn btn-cancel" data-action="close">나중에</button>
+            <button type="button" class="btn btn-save" data-action="allow">허용</button>
+          </div>
+        </div>
+      </div>`;
+    document.body.appendChild(notificationOverlay);
+
+    notificationOverlay.addEventListener("click", (e) => {
+      if (e.target.closest('[data-action="close"]')) closeNotification();
+    });
+    notificationOverlay.addEventListener("keydown", (e) => {
+      if (e.key === "Escape") closeNotification();
+    });
+    return notificationOverlay;
+  }
+
+  function closeNotification() {
+    if (notificationOverlay) notificationOverlay.hidden = true;
+  }
+
+  // 네이티브는 @capacitor/push-notifications, 웹은 Notification API로 현재 권한 상태를 확인한다.
+  // 둘 다 없으면(지원 안 하는 환경) null - 호출한 쪽은 "모름"으로 간주한다.
+  async function notificationPermissionState() {
+    try {
+      const Push = window.Capacitor?.Plugins?.PushNotifications;
+      if (Push?.checkPermissions) {
+        const { receive } = await Push.checkPermissions();
+        return receive ?? null; // 'granted' | 'denied' | 'prompt'
+      }
+    } catch (err) {
+      console.warn("[permissionPrompt] 알림 권한 상태 확인 실패(네이티브)", err);
+    }
+    if (typeof Notification !== "undefined" && Notification.permission) {
+      return Notification.permission; // 'granted' | 'denied' | 'default'
+    }
+    return null;
+  }
+
+  // 설정 화면의 "알림 켜기" 버튼을 누른 직후 호출한다. 이미 거부됨/iOS Safari 비설치 상태는 호출하는 쪽이
+  // 버튼 자체를 안내 문구로 바꿔서 이 함수가 불릴 일이 없게 막아 둔다 - 그래서 여기는 안내 후 실제 권한
+  // 요청(onAllow)으로 이어지는 경로만 다룬다.
+  function askNotification(onAllow) {
+    const el = ensureNotificationOverlay();
+    const allowBtn = el.querySelector('[data-action="allow"]');
+    allowBtn.onclick = () => {
+      closeNotification();
+      onAllow();
+    };
+    el.hidden = false;
+  }
+
   window.TripLog = window.TripLog || {};
-  window.TripLog.permissionPrompt = { askCamera };
+  window.TripLog.permissionPrompt = { askCamera, askNotification, notificationPermissionState };
 })();

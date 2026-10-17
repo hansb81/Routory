@@ -1,9 +1,10 @@
 // @별칭 MEMBERS · 참여 인원 표시 · 멤버 관리 창
 // (전체 지도는 D:/VibeCoding/Study_01/comments.html)
-// 나의 여행 화면의 참여 인원 표시와 '멤버 관리' 창.
+// 나의 여행 화면의 참여 인원 표시와, SHELL 우측 메뉴(tripShell.js)의 '동행자 관리'가 여는 멤버 창.
 //  - 헤더 아래에 참여자의 프로필 이미지를 작게 겹쳐 보여준다 (3명까지 원형 아바타, 나머지는 "+N명").
-//  - 여행을 만든 사람(owner)에게만 그 줄이 '멤버 관리' 버튼이 되고, 누르면 멤버 목록과 각 멤버 옆의 '내보내기' 버튼이 있는 창이 열린다.
-//    내보내기는 trip_members에서 그 행을 지운다 (RLS: owner만, 자기 자신은 못 지움). 실수로 누르지 않게 두 번 눌러야 지워진다.
+//  - 멤버 창(open/openManage)은 owner와 초대받은 참여자(editor) 모두 열 수 있지만 내용이 다르다: owner는
+//    각 멤버 옆에 '내보내기' 버튼이 있고(실수로 누르지 않게 두 번 눌러야 지워진다), editor는 내보내기 없이
+//    함께 하는 멤버 목록만 본다. 내보내기는 trip_members에서 그 행을 지운다 (RLS: owner만, 자기 자신은 못 지움).
 // 멤버 이름과 프로필 사진은 로그인 정보(auth.users)에 있어서 클라이언트가 직접 읽을 수 없다. 서버 함수 get_trip_members
 // (supabase/migrations/003)가 이 여행의 멤버에게만 이름·사진을 돌려주고, 그 함수가 없으면 이름 없이 인원수만 보여준다.
 
@@ -91,7 +92,7 @@
     container.hidden = false;
   }
 
-  // ---- 멤버 관리 창 (owner 전용) ----
+  // ---- 멤버 관리 창 (owner/editor 모두 열 수 있다 - 내보내기만 owner 전용) ----
 
   let overlay = null;
   let manageTrip = null;
@@ -128,13 +129,13 @@
     });
   }
 
-  function rowHtml(member, myId) {
+  function rowHtml(member, myId, viewerIsOwner) {
     const isMe = member.userId === myId;
     const isOwner = member.role === "owner";
     const badge = isOwner ? "만든 사람" : "참여자";
     const armed = armedUserId === member.userId;
-    // 만든 사람 자신은 내보낼 수 없다
-    const action = isOwner || isMe ? "" : `<button type="button" class="btn ${armed ? "btn-danger" : "btn-cancel"} member-kick" data-kick="${escapeHtml(member.userId)}">${armed ? "정말 내보내기" : "내보내기"}</button>`;
+    // 내보내기는 owner만 할 수 있다 (만든 사람 자신과 나 자신은 대상에서 뺀다)
+    const action = !viewerIsOwner || isOwner || isMe ? "" : `<button type="button" class="btn ${armed ? "btn-danger" : "btn-cancel"} member-kick" data-kick="${escapeHtml(member.userId)}">${armed ? "정말 내보내기" : "내보내기"}</button>`;
     return `
       <li class="member-row" data-name="${escapeHtml(displayName(member))}">
         ${avatarHtml(member)}
@@ -150,6 +151,8 @@
     const run = ++manageRun;
     const list = overlay.querySelector("[data-member-list]");
     const note = overlay.querySelector("[data-member-note]");
+    const viewerIsOwner = manageTrip.role === "owner";
+    overlay.querySelector("#member-modal-title").textContent = viewerIsOwner ? "멤버 관리" : "함께하는 멤버";
     note.textContent = "멤버를 불러오는 중이에요...";
     note.hidden = false;
 
@@ -165,14 +168,18 @@
     if (run !== manageRun) return;
 
     const myId = auth.getUserId();
-    list.innerHTML = members.map((m) => rowHtml(m, myId)).join("");
-    const others = members.filter((m) => m.role !== "owner");
-    note.textContent = others.length ? "내보낸 멤버는 초대 링크로 다시 들어올 수 있어요." : "아직 참여한 사람이 없어요. 일정 화면의 '초대하기'로 링크를 보내보세요.";
+    list.innerHTML = members.map((m) => rowHtml(m, myId, viewerIsOwner)).join("");
+    if (!viewerIsOwner) {
+      note.textContent = "함께 여행하는 멤버예요.";
+    } else {
+      const others = members.filter((m) => m.role !== "owner");
+      note.textContent = others.length ? "내보낸 멤버는 초대 링크로 다시 들어올 수 있어요." : "아직 참여한 사람이 없어요. '여행 공유'로 링크를 보내보세요.";
+    }
     note.hidden = false;
   }
 
   function openManage(trip) {
-    if (trip.role !== "owner") return; // 화면에서 숨기지만, 혹시 몰라 한 번 더 막는다
+    if (!trip) return;
     ensureOverlay();
     manageTrip = trip;
     armedUserId = null;
@@ -212,8 +219,10 @@
     if (container) mount(container, manageTrip); // 헤더의 아바타 줄도 새로 고친다
   }
 
-  router.onLeave("my-trip", closeManage);
+  // SHELL이 보이는 화면들(my-trip/schedule/budget/wallet/lodging) 어디서든 열 수 있어서, 그중 어느 화면을
+  // 벗어나도 닫아야 한다 (tripShell.js의 SHELL_ROUTES와 같은 목록).
+  ["my-trip", "schedule", "budget", "wallet", "lodging"].forEach((name) => router.onLeave(name, closeManage));
 
   window.TripLog = window.TripLog || {};
-  window.TripLog.tripMembers = { mount };
+  window.TripLog.tripMembers = { mount, open: openManage };
 })();
