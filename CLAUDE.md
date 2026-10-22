@@ -49,14 +49,15 @@ Full original wording (element-id rules, z-index token names, exact alias-tag lo
 
   | 역할 | 토큰 | 값 |
   |---|---|---|
-  | 기본 글자 | `--text` | `#26364a` |
-  | 제목/강조 | `--text-soft` | `#1e293b` |
-  | 보조 글자 | `--text-muted` / `--text-faint` | `#64748b` / `#94a3b8` |
+  | 기본 글자 | `--text` | `#111827` |
+  | 제목/강조 | `--text-soft` | `#111827` |
+  | 보조 글자 | `--text-muted` / `--text-faint` | `#6b7280` / `#94a3b8` |
   | 레드 계열 | `--text-danger` | `#ff7b72` |
   | 블루 계열 | `--text-accent` | `#3b82f6` |
   | 비활성화 | `--disabled` | `#94a3b8` |
 
-  `--accent`/`--danger` themselves are unchanged (`#007aff`/`#ff3b30`) because they're reused for backgrounds, borders and `accent-color` (checkbox tint) across ~75 rules, not just text — retinting them would recolor buttons/badges too. `--text-accent`/`--text-danger` exist only for `color:` declarations; never use them for `background`/`border-color`, and never point `background`/`border-color` at the plain `--accent`/`--danger` hexes when what's wanted is font-colored red/blue — use the dedicated tokens. `--danger-pastel` (D-day badge, logout link) is a separate token from the pastel policy above and is untouched by this rule. `naver-callback.html` is outside the SPA bundle (no access to `style.css` tokens) and mirrors these hexes inline — keep it in sync by hand if these values change. When adding a new text color, follow this table by default (map to the closest existing role) rather than introducing another one-off hex — only flag it if it's a genuinely new role these six don't cover.
+  `--danger` unchanged (`#ff3b30`) — red stays as-is. `--accent` (buttons/borders/checkbox `accent-color`, ~75 rules) is now pastel blue `#8cb4ff` app-wide incl. popups — see **클린 미니멀 base palette** below. `--text-accent`/`--text-danger` are `color:`-only (readable blue/red, not pastel) — never use for `background`/`border-color`, and never point those at the plain `--accent`/`--danger` hexes. `--danger-pastel` untouched. `naver-callback.html`/`account-deletion.html` mirror these hexes by hand (outside the SPA bundle) — sync on change. Default new text colors to this table rather than a one-off hex.
+- **클린 미니멀 base palette** (요청, 전체 화면+팝업 기본값, 새 화면도 따를 것): `--page-bg`/`--page-bg-blue` `#f8fafc`, `--surface`/`--surface-blue` `#ffffff`, `--shadow-sm` `0 2px 8px rgba(0,0,0,.04)`, `--accent` `#8cb4ff`(참고 이미지 기준). 레드 계열은 대상 밖. 상세: `docs/features/color-policy.md`.
 
 ## Architecture (skeleton)
 
@@ -75,6 +76,7 @@ Read the relevant file before working on that area; write new implementation det
 | My-trip page (status cards) | `screen-my-trip.md` |
 | Schedule page, item form, drag/swipe reorder | `screen-schedule.md` |
 | Budget page, expense form | `screen-budget.md` |
+| Checklist page (준비물 체크리스트) | `screen-checklist.md` |
 | Wallet page, visibility, upload form, viewer | `screen-wallet.md` |
 | Common pages (알림 · 설정) | `screen-common-pages.md` |
 | Account deletion (in-app + no-login page) | `screen-account-delete.md` |

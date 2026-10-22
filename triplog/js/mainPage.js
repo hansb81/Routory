@@ -302,7 +302,13 @@
         <ul class="mytrip-menu">
           <li><button type="button" data-action="import-trip">여행 가져오기</button></li>
           <li><button type="button" data-action="past-trips">지난 여행</button></li>
+          <li><button type="button" data-action="travel-benefit">여행 혜택·축제</button></li>
+          <li><button type="button" data-action="travel-safety">여행 안전</button></li>
         </ul>
+        <div class="main-menu-links">
+          <button type="button" data-action="notice">공지사항</button>
+          <button type="button" data-action="contact">문의하기</button>
+        </div>
       </aside>`;
     document.body.appendChild(menuEl);
     removeBrokenAvatars(menuEl); // menuEl은 pageEl 밖의 별도 트리라 render()가 el에 건 캡처 리스너가 안 닿는다
@@ -315,6 +321,18 @@
       } else if (e.target.closest('[data-action="past-trips"]')) {
         setMenu(false);
         router.navigate(router.buildPath("past-trips"));
+      } else if (e.target.closest('[data-action="travel-benefit"]')) {
+        setMenu(false);
+        router.navigate(`${router.buildPath("travel-feed")}?kind=benefit&scope=overseas`);
+      } else if (e.target.closest('[data-action="travel-safety"]')) {
+        setMenu(false);
+        router.navigate(`${router.buildPath("travel-feed")}?kind=safety`);
+      } else if (e.target.closest('[data-action="notice"]')) {
+        setMenu(false);
+        router.navigate(router.buildPath("notice"));
+      } else if (e.target.closest('[data-action="contact"]')) {
+        setMenu(false);
+        router.navigate(router.buildPath("contact"));
       } else if (e.target.closest('[data-action="notifications"]')) {
         setMenu(false);
         router.navigate(router.buildPath("notifications"));

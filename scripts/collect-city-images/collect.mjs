@@ -104,11 +104,13 @@ async function uploadToStorage(supabase, buffer, path) {
   return data.publicUrl;
 }
 
+// is_active 여부로 거르지 않는다 - 관리 페이지(admin.html)가 "승인 대기" 상태로 도시를 추가한 뒤 콘텐츠
+// (이미지 포함)를 채우고서야 "게시"를 누르는 흐름으로 바뀌어서, 이미지 후보는 승인 대기 도시에도 미리
+// 모여 있어야 관리자가 검토·게시할 수 있다 (admin.html의 "+ 도시 추가"는 이제 is_active:false로 넣는다).
 async function fetchActiveCities(supabase, cityFilter) {
   const { data, error } = await supabase
     .from("discover_cities")
-    .select("id, destinations(id, name_ko, name_en, country_code)")
-    .eq("is_active", true);
+    .select("id, destinations(id, name_ko, name_en, country_code)");
   if (error) throw error;
   const rows = (data || []).filter((row) => row.destinations);
   if (!cityFilter) return rows;
@@ -168,7 +170,7 @@ async function main() {
 
   const cities = await fetchActiveCities(supabase, args.city);
   if (cities.length === 0) {
-    console.log("[collect-city-images] 조건에 맞는 활성 도시가 없어요.");
+    console.log("[collect-city-images] 조건에 맞는 도시가 없어요.");
     return;
   }
 

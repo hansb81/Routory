@@ -31,6 +31,16 @@
 
 const NOTIFY_SECRET_HEADER = "x-notify-secret";
 
+// 상수 시간 비교(2026-10-19 보안 점검 EDGE-05, collect-travel-feed#timingSafeEqual과 동일)
+function timingSafeEqual(a: string, b: string): boolean {
+  const ab = new TextEncoder().encode(a);
+  const bb = new TextEncoder().encode(b);
+  if (ab.length !== bb.length) return false;
+  let diff = 0;
+  for (let i = 0; i < ab.length; i++) diff |= ab[i] ^ bb[i];
+  return diff === 0;
+}
+
 type Db = { supabaseUrl: string; serviceRoleKey: string; anonKey: string };
 
 function json(body: unknown, status = 200): Response {
@@ -164,7 +174,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method !== "POST") return json({ error: "POST 요청만 받아요" }, 405);
 
   const notifySecret = Deno.env.get("NOTIFY_SECRET");
-  if (!notifySecret || req.headers.get(NOTIFY_SECRET_HEADER) !== notifySecret) {
+  if (!notifySecret || !timingSafeEqual(req.headers.get(NOTIFY_SECRET_HEADER) ?? "", notifySecret)) {
     return json({ error: "unauthorized" }, 401);
   }
 

@@ -14,12 +14,14 @@
 //   #/consent          약관 동의 (로그인은 했지만 user_consents 행이 아직 없는 사용자만 거친다, consentPage.js)
 //   #/invite/:code     초대 링크로 여행에 참여
 //   #/budget/:id       가계부
+//   #/checklist/:id    체크리스트 (준비물)
 //   #/wallet/:id       여행지갑 (이 여행에 올린 문서만 보여준다 — 개인지갑도 공유지갑도 여행별로 따로 쌓인다)
 //   #/lodging/:id      숙소 추가 (일정 화면의 QUICK-MENU "+ 숙소"에서 들어온다)
 //   #/notifications    알림 (MAIN-MENU·SHELL MYTRIP-MENU 공용, commonPages.js)
 //   #/settings         설정 (위와 같은 공용 화면)
 //   #/terms            이용약관 (정적 화면, legalPages.js) - 로그인 없이도 볼 수 있다(로그인 가드 없음)
 //   #/privacy          개인정보처리방침 (위와 같음)
+//   #/ai-usage         AI 및 외부 서비스 이용 안내 (위와 같음, legalPages.js)
 //   #/account-delete   회원 탈퇴 (설정 > 계정에서 들어온다, accountDeletePage.js)
 //   #/notice           공지사항 (설정 > 고객센터, commonPages.js) - 아직 "준비 중" 자리표시자 화면
 //   #/contact          문의하기 (위와 같은 자리)
@@ -43,12 +45,14 @@
     { name: "consent", path: "/consent", title: "약관 동의" }, // 로그인은 했지만 아직 동의하지 않은 사용자만 거친다 (consentPage.js)
     { name: "invite", path: "/invite/:code", title: "초대" },
     { name: "budget", path: "/budget/:id", title: "가계부" },
+    { name: "checklist", path: "/checklist/:id", title: "체크리스트" },
     { name: "wallet", path: "/wallet/:id", title: "여행지갑" }, // 여행별로 따로 쌓이므로 다른 셸 화면들과 같은 :id가 있다
     { name: "lodging", path: "/lodging/:id", title: "숙소" },
     { name: "notifications", path: "/notifications", title: "알림" }, // MAIN-MENU·SHELL의 MYTRIP-MENU 양쪽에서 여는 공용 화면 (commonPages.js)
     { name: "settings", path: "/settings", title: "설정" }, // 위와 같은 공용 화면 쌍
     { name: "terms", path: "/terms", title: "이용약관" }, // 정적 화면 (legalPages.js), 로그인 가드 없음
     { name: "privacy", path: "/privacy", title: "개인정보처리방침" }, // 위와 같음
+    { name: "ai-usage", path: "/ai-usage", title: "AI 및 외부 서비스 이용 안내" }, // 위와 같음 (legalPages.js)
     { name: "account-delete", path: "/account-delete", title: "회원 탈퇴" }, // 설정 > 계정에서 들어온다 (accountDeletePage.js)
     { name: "notice", path: "/notice", title: "공지사항" }, // 설정 > 고객센터 (commonPages.js), 아직 "준비 중" 자리표시자
     { name: "contact", path: "/contact", title: "문의하기" }, // 위와 같은 자리
@@ -66,12 +70,14 @@
     consent: "CONSENT · 약관 동의 화면",
     invite: "INVITE-PAGE · 초대 수락 화면",
     budget: "BUDGET · 가계부 화면",
+    checklist: "CHECKLIST · 체크리스트 화면",
     wallet: "WALLET · 여행지갑 화면",
     lodging: "LODGING · 숙소 추가 화면",
     notifications: "NOTIFICATIONS · 알림 화면",
     settings: "SETTINGS · 설정 화면",
     terms: "TERMS · 이용약관 화면",
     privacy: "PRIVACY · 개인정보처리방침 화면",
+    "ai-usage": "AI-USAGE · AI 및 외부 서비스 이용 안내 화면",
     "account-delete": "ACCOUNT-DELETE · 회원 탈퇴 화면",
     notice: "NOTICE · 공지사항 화면",
     contact: "CONTACT · 문의하기 화면",

@@ -21,11 +21,14 @@
   const { escapeHtml } = window.TripLog.util;
   const { WALLET_CATEGORIES, WALLET_VISIBILITY, DEFAULT_VISIBILITY } = window.TripLog.walletCategoryData;
 
-  const MAX_FILE_BYTES = 10 * 1024 * 1024; // PRD 4-5: 개당 최대 10MB
+  const MAX_FILE_BYTES = 10 * 1024 * 1024; // PRD 4-5: 개당 최대 10MB (압축 전 원본 기준)
+  const WALLET_IMAGE_MAX_DIMENSION = 1920; // 압축 후 긴 변 최대 길이(px)
+  const WALLET_IMAGE_QUALITY = 0.82; // JPEG 재인코딩 품질
 
   let onChange = () => {};
   let els = null; // ensureModal이 한 번만 만든다
-  let state = { file: null, fileType: null, previewUrl: null, categoryKey: null, visibility: DEFAULT_VISIBILITY, saving: false };
+  let fileToken = 0; // 압축이 끝나기 전에 다른 파일을 고르면 이전 결과를 버리기 위한 토큰 (hydrateId와 같은 패턴)
+  let state = { file: null, fileType: null, previewUrl: null, categoryKey: null, visibility: DEFAULT_VISIBILITY, saving: false, compressing: false };
 
   function ensureModal() {
     if (els) return;
@@ -127,7 +130,34 @@
 
   // ---- 파일 선택 · 미리보기 ----
 
-  function handleFileChosen(file) {
+  // Storage 무료 플랜(프로젝트 전체 1GB)을 사진 원본(수 MB~10MB대)이 빨리 채우는 걸 막으려고, 올리기 전에
+  // 긴 변을 WALLET_IMAGE_MAX_DIMENSION 이하로 줄이고 JPEG로 재인코딩한다. createImageBitmap에
+  // imageOrientation: "from-image"를 줘서 디코딩 - 안 주면 모바일 카메라 사진의 EXIF 회전 정보가 무시돼서
+  // canvas에 그릴 때 세로로 찍은 사진이 가로로 돌아간 채 저장된다(데스크톱 파일 선택엔 보통 이 메타데이터가
+  // 없어서 안 드러나던 문제). PDF는 압축 대상이 아니다(그대로 올린다).
+  async function compressImage(file) {
+    const bitmap = await createImageBitmap(file, { imageOrientation: "from-image" });
+    try {
+      const scale = Math.min(1, WALLET_IMAGE_MAX_DIMENSION / Math.max(bitmap.width, bitmap.height));
+      const width = Math.round(bitmap.width * scale);
+      const height = Math.round(bitmap.height * scale);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = width;
+      canvas.height = height;
+      canvas.getContext("2d").drawImage(bitmap, 0, 0, width, height);
+
+      const blob = await new Promise((resolve) => canvas.toBlob(resolve, "image/jpeg", WALLET_IMAGE_QUALITY));
+      if (!blob || blob.size >= file.size) return file; // 이미 작은 사진 등 압축이 더 커지면 원본을 그대로 쓴다
+
+      const name = file.name.replace(/\.[^.]+$/, "") + ".jpg";
+      return new File([blob], name, { type: "image/jpeg" });
+    } finally {
+      bitmap.close();
+    }
+  }
+
+  async function handleFileChosen(file) {
     if (!file) return;
     if (file.size > MAX_FILE_BYTES) {
       showError("파일 용량은 10MB를 넘을 수 없어요.");
@@ -141,23 +171,47 @@
     }
 
     clearError();
+    const token = ++fileToken;
+    state.compressing = false; // 새로 고른 파일이 이전 선택(압축 중이었을 수도 있는)의 스피너를 덮어쓴다
+
+    let finalFile = file;
+    if (isImage) {
+      state.compressing = true;
+      renderPreview();
+      try {
+        finalFile = await compressImage(file);
+      } catch {
+        finalFile = file; // 압축 실패(지원 안 하는 브라우저/손상된 파일 등) 시 원본을 그대로 올린다
+      }
+      if (token !== fileToken) return; // 그사이 다른 파일을 골랐으면 이 결과는 버린다 (그 파일이 이미 compressing을 자기 상태로 바꿔놨다)
+      state.compressing = false;
+    }
+
     if (state.previewUrl) URL.revokeObjectURL(state.previewUrl);
-    state.file = file;
+    state.file = finalFile;
     state.fileType = isImage ? "image" : "pdf";
-    state.previewUrl = isImage ? URL.createObjectURL(file) : null;
+    state.previewUrl = isImage ? URL.createObjectURL(finalFile) : null;
     renderPreview();
   }
 
   function clearFile() {
+    fileToken++; // 압축이 진행 중이었다면 그 결과를 버린다
     if (state.previewUrl) URL.revokeObjectURL(state.previewUrl);
     state.file = null;
     state.fileType = null;
     state.previewUrl = null;
+    state.compressing = false;
     renderPreview();
   }
 
-  // 사진은 그대로 보여주고, PDF는 파일명만 보여준다 (PRD 4-2)
+  // 사진은 그대로 보여주고, PDF는 파일명만 보여준다 (PRD 4-2); 압축 중에는 안내 문구만 보여준다
   function renderPreview() {
+    updateSaveDisabled();
+    if (state.compressing) {
+      els.preview.hidden = false;
+      els.preview.innerHTML = `<span class="wallet-preview-status">압축 중...</span>`;
+      return;
+    }
     if (!state.file) {
       els.preview.hidden = true;
       els.preview.innerHTML = "";
@@ -225,12 +279,18 @@
     els.error.hidden = true;
   }
 
+  // 압축 중이거나 업로드 중에는 저장 버튼을 눌러도 아직 준비되지 않은 파일이 제출되지 않게 막는다
+  function updateSaveDisabled() {
+    els.saveBtn.disabled = state.compressing || state.saving;
+  }
+
   // ---- 열기/닫기 ----
 
   function open() {
     ensureModal();
     if (state.previewUrl) URL.revokeObjectURL(state.previewUrl);
-    state = { file: null, fileType: null, previewUrl: null, categoryKey: null, visibility: DEFAULT_VISIBILITY, saving: false };
+    fileToken++; // 열려 있던 창에서 압축이 진행 중이었다면 그 결과를 버린다
+    state = { file: null, fileType: null, previewUrl: null, categoryKey: null, visibility: DEFAULT_VISIBILITY, saving: false, compressing: false };
 
     els.form.reset();
     els.title.value = "";
@@ -244,13 +304,13 @@
   }
 
   function close() {
-    if (state.saving) return; // 업로드 중에는 창을 닫아 중간에 끊기지 않게 한다
+    if (state.saving || state.compressing) return; // 업로드/압축 중에는 창을 닫아 중간에 끊기지 않게 한다
     els.overlay.hidden = true;
   }
 
   async function handleSubmit(e) {
     e.preventDefault();
-    if (state.saving) return;
+    if (state.saving || state.compressing) return;
 
     const title = els.title.value.trim();
     const description = els.description.value.trim();
@@ -265,7 +325,7 @@
 
     clearError();
     state.saving = true;
-    els.saveBtn.disabled = true;
+    updateSaveDisabled();
     els.saveBtn.textContent = "업로드 중...";
 
     try {
@@ -275,7 +335,7 @@
       return;
     } finally {
       state.saving = false;
-      els.saveBtn.disabled = false;
+      updateSaveDisabled();
       els.saveBtn.textContent = "저장";
     }
 

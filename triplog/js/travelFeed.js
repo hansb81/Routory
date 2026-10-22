@@ -13,7 +13,7 @@
 (function () {
   const router = window.TripLog.router;
   const auth = window.TripLog.auth;
-  const { escapeHtml } = window.TripLog.util;
+  const { escapeHtml, safeHttpUrl } = window.TripLog.util;
   const weatherCodes = window.TripLog.weatherCodes;
   const tripSetup = window.TripLog.tripSetup;
   const storage = window.TripLog.storage;
@@ -25,7 +25,7 @@
   const cache = new Map(); // `${kind}|${scope}|${limit}` -> { data, fetchedAt }
   const rowCache = new Map(); // id -> get_travel_feed 행 (상세 모달이 다시 조회하지 않고 바로 쓴다)
 
-  const KIND_LABEL = { safety: "여행 안전", benefit: "여행 혜택" };
+  const KIND_LABEL = { safety: "여행 안전", benefit: "여행 혜택·축제" };
   const IMPORTANCE_LABEL = { high: "높음", medium: "보통", low: "참고" };
 
   // ---- 공용: 날짜·기간·원문 링크 ----
@@ -88,11 +88,27 @@
     return labels.join("");
   }
 
+  // 리스트 카드의 썸네일 위 짧은 출처 배지 - 카드 전체가 클릭 대상(openDetail)이라 상세 모달의
+  // imageCreditHtml()과 달리 링크를 넣지 않는다(링크를 넣으면 클릭이 두 동작 - 이동/상세 열기 - 으로
+  // 갈려서 꼬인다). 저작자 이름이 있으면 그걸, 없으면 출처 사이트 이름만 짧게 보여준다.
+  function imageCreditShortText(row) {
+    const who = row.image_credit_name || row.image_source_name;
+    return who ? `사진: ${who}` : "";
+  }
+
   function feedCardHtml(row) {
     const dateLine = row.kind === "benefit" ? periodLabel(row) : formatDateDots(row.published_at);
     const metaText = [row.region_label, dateLine].filter(Boolean).join(" · ");
+    const creditText = row.image_url ? imageCreditShortText(row) : "";
+    const imageHtml = row.image_url
+      ? `<div class="feed-card-thumb">
+          <img src="${escapeHtml(row.image_url)}" alt="" loading="lazy" decoding="async" />
+          ${creditText ? `<span class="feed-card-image-credit">${escapeHtml(creditText)}</span>` : ""}
+        </div>`
+      : "";
     return `
       <li class="feed-card" data-id="${escapeHtml(row.id)}">
+        ${imageHtml}
         <div class="feed-card-top">
           <span class="feed-badge feed-badge--${escapeHtml(row.importance)}">${escapeHtml(IMPORTANCE_LABEL[row.importance] || row.importance)}</span>
           ${matchLabelsHtml(row)}
@@ -148,7 +164,7 @@
 
   // 탭/칩 선택은 메인 화면이 다시 그려져도(여행 목록이 바뀔 때마다 mainPage.js가 el.innerHTML을 통째로
   // 다시 쓴다) 유지되도록 모듈 범위에 둔다 - DOM은 매번 새로 생기지만 이 state는 그대로다.
-  const mainState = { kind: "safety", scope: "overseas" };
+  const mainState = { kind: "benefit", scope: "overseas" };
   let mainFeedSectionEl = null;
   let mainFeedGen = 0;
 
@@ -162,8 +178,8 @@
           <h2 class="main-section-title">여행 소식</h2>
         </div>
         <div class="tab-row" data-feed-kind-tabs>
+          <button type="button" class="tab${mainState.kind === "benefit" ? " tab--active" : ""}" data-kind="benefit">여행 혜택·축제</button>
           <button type="button" class="tab${mainState.kind === "safety" ? " tab--active" : ""}" data-kind="safety">여행 안전</button>
-          <button type="button" class="tab${mainState.kind === "benefit" ? " tab--active" : ""}" data-kind="benefit">여행 혜택</button>
         </div>
         <div class="tab-row tab-row--sub" data-feed-scope-chips${mainState.kind === "benefit" ? "" : " hidden"}>
           <button type="button" class="tab${mainState.scope === "overseas" ? " tab--active" : ""}" data-scope="overseas">해외</button>
@@ -318,6 +334,8 @@
     wrap.innerHTML = `
       <div class="modal-overlay feed-detail-overlay" hidden>
         <div class="modal feed-detail-modal" role="dialog" aria-modal="true" aria-labelledby="feed-detail-title">
+          <img class="feed-detail-image" data-detail-image alt="" loading="lazy" decoding="async" hidden />
+          <p class="feed-detail-image-credit" data-detail-image-credit hidden></p>
           <div class="feed-detail-top">
             <span class="feed-badge" data-detail-importance></span>
             <button type="button" class="mytrip-icon-btn" data-action="close" aria-label="닫기">
@@ -346,11 +364,49 @@
     });
   }
 
+  // 사진 출처 표기(요구사항: "사진 출처도 남겨줘야 한다") - 둘 다 없으면("" 반환) 호출 쪽이 그 줄 자체를
+  // 숨긴다(관리자가 직접 URL만 넣고 출처는 안 채운 경우). discover-city 상세(discoverCreditSectionHtml)와
+  // 같은 모양 - 저작자 이름/출처 이름 각각 링크가 있으면 그 프로필/원본으로 건다.
+  function imageCreditHtml(row) {
+    if (!row.image_credit_name && !row.image_source_name) return "";
+    const parts = [];
+    if (row.image_credit_name) {
+      const creditUrl = safeHttpUrl(row.image_credit_url); // http(s)가 아니면("" ) 링크 없이 평문으로
+      const nameHtml = creditUrl
+        ? `<a href="${escapeHtml(creditUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(row.image_credit_name)}</a>`
+        : escapeHtml(row.image_credit_name);
+      parts.push(`사진: ${nameHtml}`);
+    }
+    if (row.image_license) parts.push(escapeHtml(row.image_license));
+    if (row.image_source_name) {
+      const sourceUrl = safeHttpUrl(row.image_source_url);
+      const sourceHtml = sourceUrl
+        ? `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(row.image_source_name)} 원본 보기</a>`
+        : escapeHtml(row.image_source_name);
+      parts.push(sourceHtml);
+    }
+    return parts.join(" · ");
+  }
+
   function openDetail(id) {
     const row = rowCache.get(id);
     if (!row) return;
     ensureDetailModal();
     detailOverlay.dataset.sourceUrl = row.source_url;
+    const imageEl = detailOverlay.querySelector("[data-detail-image]");
+    const creditEl = detailOverlay.querySelector("[data-detail-image-credit]");
+    if (row.image_url) {
+      imageEl.src = row.image_url;
+      imageEl.hidden = false;
+      const creditHtml = imageCreditHtml(row);
+      creditEl.innerHTML = creditHtml;
+      creditEl.hidden = !creditHtml;
+    } else {
+      imageEl.hidden = true;
+      imageEl.removeAttribute("src");
+      creditEl.innerHTML = "";
+      creditEl.hidden = true;
+    }
     detailOverlay.querySelector("[data-detail-importance]").className = `feed-badge feed-badge--${row.importance}`;
     detailOverlay.querySelector("[data-detail-importance]").textContent = IMPORTANCE_LABEL[row.importance] || row.importance;
     detailOverlay.querySelector("[data-detail-title]").textContent = row.title;
@@ -610,13 +666,18 @@
     if (!image) return "";
     // creditUrl이 있으면 저작자 이름도 그 프로필로 링크한다(Unsplash처럼 "저작자 이름을 프로필에 링크"를
     // 요구하는 라이선스가 있어서 - 없으면 평문, 기존 Wikimedia/Pexels 표시와 동일하게 동작한다).
-    const creditNameHtml = image.creditUrl
-      ? `<a href="${escapeHtml(image.creditUrl)}" target="_blank" rel="noopener">${escapeHtml(image.creditName)}</a>`
+    const creditUrl = safeHttpUrl(image.creditUrl);
+    const creditNameHtml = creditUrl
+      ? `<a href="${escapeHtml(creditUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(image.creditName)}</a>`
       : escapeHtml(image.creditName);
+    const sourceUrl = safeHttpUrl(image.sourceUrl);
+    const sourceHtml = sourceUrl
+      ? `<a href="${escapeHtml(sourceUrl)}" target="_blank" rel="noopener noreferrer">${escapeHtml(image.sourceName)} 원본 보기</a>`
+      : escapeHtml(image.sourceName);
     return `
       <p class="discover-detail-credit">
         사진: ${creditNameHtml} · ${escapeHtml(image.license)} ·
-        <a href="${escapeHtml(image.sourceUrl)}" target="_blank" rel="noopener">${escapeHtml(image.sourceName)} 원본 보기</a>
+        ${sourceHtml}
       </p>`;
   }
 

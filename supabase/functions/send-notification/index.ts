@@ -71,6 +71,16 @@
 import webpush from "https://esm.sh/web-push@3.6.7";
 
 const NOTIFY_SECRET_HEADER = "x-notify-secret";
+
+// 상수 시간 비교(2026-10-19 보안 점검 EDGE-05, collect-travel-feed#timingSafeEqual과 동일)
+function timingSafeEqual(a: string, b: string): boolean {
+  const ab = new TextEncoder().encode(a);
+  const bb = new TextEncoder().encode(b);
+  if (ab.length !== bb.length) return false;
+  let diff = 0;
+  for (let i = 0; i < ab.length; i++) diff |= ab[i] ^ bb[i];
+  return diff === 0;
+}
 const BATCH_SIZE = 500; // 요청 7번
 const FCM_CHANNEL_ID = "routory-default"; // pushNotifications.js가 만드는 Android 알림 채널과 같은 id
 const DEFAULT_VAPID_SUBJECT = "mailto:support@routory.app";
@@ -274,12 +284,37 @@ async function sendFcm(accessToken: string, projectId: string, token: string, pa
 
 // ---- Web Push ----
 
+// 알려진 Web Push 서비스 호스트만 허용한다(SSRF 방지) - device_tokens.token은 사용자 자신의 RLS 행이라
+// 클라이언트가 PushManager.subscribe()를 거치지 않고 임의의 endpoint(사설 IP, 클라우드 메타데이터 주소 등)를
+// 직접 써 넣을 수 있다. webpush.sendNotification()은 그 endpoint로 그대로 HTTP 요청을 보내므로, 실제
+// 브라우저가 만드는 구독이 쓰는 호스트인지 먼저 확인한 뒤에만 보낸다.
+const ALLOWED_WEB_PUSH_HOSTS = new Set([
+  "fcm.googleapis.com", // Chrome·Edge·Samsung Internet 등 Chromium 계열
+  "updates.push.services.mozilla.com", // Firefox
+  "web.push.apple.com", // Safari
+]);
+
+function isAllowedPushEndpoint(endpoint: unknown): endpoint is string {
+  if (typeof endpoint !== "string") return false;
+  try {
+    const url = new URL(endpoint);
+    return url.protocol === "https:" && ALLOWED_WEB_PUSH_HOSTS.has(url.hostname);
+  } catch {
+    return false;
+  }
+}
+
 async function sendWebPushOne(subscriptionToken: string, payloadJson: string): Promise<{ ok: boolean; invalid: boolean; errorMessage?: string }> {
   let subscription: webpush.PushSubscription;
   try {
     subscription = JSON.parse(subscriptionToken);
   } catch {
     return { ok: false, invalid: true, errorMessage: "저장된 구독 JSON을 파싱하지 못했어요" };
+  }
+  if (!isAllowedPushEndpoint(subscription?.endpoint)) {
+    // 알려진 푸시 서비스 주소가 아니면 보내지 않는다 - 손상되거나 조작된 구독과 같은 방식으로 처리해서
+    // device_tokens에서 지운다(요청 5번과 동일한 "무효 토큰 정리" 경로를 탄다).
+    return { ok: false, invalid: true, errorMessage: "알 수 없는 endpoint예요" };
   }
   try {
     await webpush.sendNotification(subscription, payloadJson, { TTL: 60 * 60 });
@@ -297,7 +332,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method !== "POST") return json({ error: "POST 요청만 받아요" }, 405);
 
   const notifySecret = Deno.env.get("NOTIFY_SECRET");
-  if (!notifySecret || req.headers.get(NOTIFY_SECRET_HEADER) !== notifySecret) {
+  if (!notifySecret || !timingSafeEqual(req.headers.get(NOTIFY_SECRET_HEADER) ?? "", notifySecret)) {
     return json({ error: "unauthorized" }, 401); // 요청 1번 - 일반 사용자 JWT는 여기서 전혀 보지 않는다
   }
 

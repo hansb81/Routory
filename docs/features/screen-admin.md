@@ -30,6 +30,14 @@
 - 저장 시 필수 검증(클라이언트): 제목/지역 표기/요약/게시일/출처 이름/출처 URL이 비어 있으면 저장 불가, 출처 URL은 `https://`로 시작해야 함. 같은 규칙을 DB에도 체크 제약으로 걸어서(`023_travel_feed_source_checks.sql`) 이 폼 하나만 믿지 않는다.
 - `origin='auto'`인 draft 행(자동 수집 후보 — **수집 Edge Function 자체는 아직 만들지 않았다**, 이 페이지는 그 결과를 검토하는 쪽만 구현됨)은 "승인 대기" 탭 안에서 다른 draft와 같이 보이되, 카드에 수집 시각(`created_at`)과 원문 링크를 추가로 보여주고, "보관" 버튼 대신 "반려" 라벨의 버튼을 쓴다 — 동작은 둘 다 `status→'archived'`로 동일하다(스키마에 `rejected` 상태가 따로 없다).
 - 카드 하단에 "게시일 · 만든이 · 수정 시각(수정한 사람) · 게시자"를 한 줄로 보여준다(변경 이력 요구사항) — `created_by`/`updated_by`/`published_by`는 `get_admin_labels()` RPC로 가져온 이메일로 표시하고, 모르는 uuid면 앞 8자만 보여준다.
+- **대표 이미지(선택, `travel_feed_items.image_url`, `035_travel_feed_image.sql`)**: "도시 이미지" 탭(추천 도시)의 Unsplash/Wikimedia 검색 패턴을 그대로 가져왔지만, `discover_city_images`처럼 별도 테이블·저작자/라이선스 컬럼·draft/published 다중 이미지 갤러리를 두지 않고 **행 하나에 URL 한 개만** 저장하는 훨씬 단순한 버전이다.
+  - `#feed-image-url` 입력칸에 직접 URL을 붙여넣거나(요구사항의 "직접 URL 입력"), 바로 아래 "Unsplash에서 검색"/"Wikimedia Commons에서 검색" 결과 카드의 "이 사진 쓰기"를 누르면 그 자리에서 `setFeedImageUrl()`이 입력칸 값과 미리보기(`#feed-image-preview`, `.admin-city-card-preview-tile` 재사용)를 같이 채운다 — 셋 다 같은 한 칸을 덮어쓸 뿐이라 "마지막으로 고른 것"이 항상 최종값이다. "이미지 제거" 버튼은 그 칸을 비운다.
+  - **Unsplash**: `search-unsplash` Edge Function(추천 도시 탭이 쓰는 것과 동일, 코드 수정 없이 재사용)을 그대로 호출 — `{query}`로 검색, 결과를 고르면 Unsplash 이용약관이 요구하는 다운로드 트래킹(`{downloadLocation}`)을 best-effort로 한 번 더 호출한다(실패해도 이미지 선택은 유지).
+  - **Wikimedia Commons**: 새 Edge Function을 안 만들고 `adminPage.js#searchFeedWikimedia`가 "도시 이미지" 탭의 `searchWikimedia`와 같은 규칙(브라우저에서 `commons.wikimedia.org/w/api.php`를 `origin=*`로 직접 호출, 허용 라이선스 화이트리스트 CC0/퍼블릭 도메인/CC BY(-SA)만, 저작자 표기 없는 결과는 제외)으로 feed 폼 전용 엘리먼트 id(`#feed-wiki-*`)에 바인딩된 별도 사본을 쓴다 — 저작자/라이선스는 검색 결과 카드에 보여주기만 하고 DB엔 저장하지 않는다(이 테이블에 그 컬럼이 없다).
+  - 저장 검증: `image_url`이 있으면 `source_url`과 같은 규칙으로 `https://`로 시작해야 저장된다(클라이언트 검증만, DB 체크 제약은 없다 — `023`의 `source_url`/`source_name` 체크와 달리 이 컬럼은 선택값이라 아직 안 걸었다).
+  - **사진 출처 표기(요구사항, `image_credit_name`/`image_credit_url`/`image_license`/`image_source_name`/`image_source_url`, `037_travel_feed_image_credit.sql`)**: Wikimedia의 CC BY(-SA)는 저작자 표기가 라이선스 조건이라, 이미지 URL뿐 아니라 "누구 사진인지·어디서 가져왔는지"도 같이 저장한다 — `discover_city_images`와 같은 필드 이름(`credit_name`/`credit_url`/`license`/`source_name`/`source_url`)을 쓰되, `travel_feed_items`엔 이미 뉴스 원문용 `source_name`/`source_url`이 있어 전부 `image_` 접두어를 붙였다. Unsplash/Wikimedia 검색 결과의 "이 사진 쓰기"를 누르면 `setFeedImageUrl(url, credit)`이 대표 이미지 URL과 이 5개 입력칸을 한 번에 채운다(그대로 저장해도 되고 관리자가 고쳐도 된다) — 직접 URL을 입력(`#feed-image-url`의 `input` 이벤트)하면 직전에 자동으로 채워진 출처가 더 이상 그 이미지의 것이 아닐 수 있어 먼저 비운다. 전부 선택값이라 비워도 저장은 되고, 그 경우 사용자 화면은 출처 줄 자체를 숨긴다. `image_credit_url`/`image_source_url`도 값이 있으면 `https://`만 허용(클라이언트 검증).
+  - **직접 URL 입력 시 호스트 기반 출처 추정(`guessImageSourceFromUrl`)**: 검색을 안 거쳤으니 특정 사진 페이지의 저작자까지는 알 수 없지만, URL의 호스트명만 보고 알려진 서비스(Unsplash/Wikimedia/Pexels, `KNOWN_IMAGE_HOSTS`)인지 먼저 체크한다 — 맞으면 그 서비스의 대표 사이트 주소(예: `https://unsplash.com`, 특정 사진 페이지가 아니라 메인 사이트)를 `image_source_name`/`image_source_url`에 채워서 완전히 빈 칸보다는 "최소한 어디서 왔는지"가 남게 한다. 모르는 호스트면 기존대로 비운다(관리자가 직접 채운다). `image_credit_name`(저작자 이름)은 이 방식으로는 못 채운다 — 저작자까지 정확히 남기려면 검색 결과를 써야 한다.
+  - 노출: 메인 화면 카드(`feedCardHtml`)와 전체 목록 화면 둘 다 카드 상단에 16:9 썸네일(`.feed-card-thumb`)로, 상세 모달(`openDetail`)은 제목 위에 같은 비율 이미지(`.feed-detail-image`)로 보여준다 — 둘 다 `image_url`이 없으면 해당 엘리먼트를 안 그리거나(`feed-card-thumb`) `hidden`을 건다(`feed-detail-image`), 기존 소식(컬럼 추가 전 행)은 전부 이미지 없이 기존 모습 그대로다. 관리 페이지 목록(`renderFeedItem`)도 `.pick-thumb`(기존 클래스 재사용)으로 작은 썸네일을 보여준다.
 
 ## 인기 여행지 관리
 
@@ -38,6 +46,13 @@
 - 출처 이름/URL은 10줄이 공유하는 필드 한 쌍뿐이다(한 번의 랭킹 발표는 보통 출처 하나라서 줄마다 따로 받지 않았다) — 비어 있거나 `https://`가 아니면 저장 자체가 안 된다.
 - "임시 저장"과 "게시" 버튼은 같은 저장 로직(각 줄을 `(scope, period, rank)` 유니크 키로 `upsert`)을 상태(`draft`/`published`)만 다르게 호출한다. 입력칸을 비운 채 저장하면 그 랭크에 이미 있던 행을 삭제한다(빈 입력 = "이 순위는 없다"는 의도로 해석).
 - 이미 저장된 줄에는 그 자리에서 바로 지울 수 있는 개별 삭제 버튼이 따로 있다(배치 저장과 별개로 즉시 실행됨).
+
+## 추천 도시 관리 (`discover_cities`)
+
+- 목록 화면에 **승인 대기(`is_active=false`) / 게시 중(`is_active=true`)** 탭이 있다(여행 소식 탭과 같은 자리·스타일). 각 도시 카드에 "게시"/"승인 대기로 전환" 버튼이 있어 상세 화면을 열지 않고도 바로 상태를 바꿀 수 있다 — 상세 화면의 "활성" 체크박스와 같은 값(`is_active`)을 공유한다.
+- "+ 도시 추가"로 새 도시를 넣으면 **바로 게시되지 않고 승인 대기로 들어간다**(`is_active:false`로 insert) — 대표 이미지·월별 추천 이유·대표 관광지를 채우기 전에 메인 화면 후보에 노출되는 걸 막기 위해서다. 콘텐츠를 다 채운 뒤 목록에서 "게시"를 눌러야 `get_discover_cities`에 포함될 수 있다.
+- `scripts/collect-city-images/collect.mjs`는 이제 `is_active` 여부로 대상을 거르지 않는다(과거엔 활성 도시만 처리) — 승인 대기 도시도 게시 전에 이미지 후보가 필요해서다.
+- **`scripts/collect-city-content/`**(신규, `collect-months.mjs`/`collect-highlights.mjs`): 월별 추천 이유(`discover_city_months`)·대표 관광지(`city_highlights`) 초안을 Open-Meteo/위키백과에서 모은다. 이 두 테이블엔 자체 draft/published 컬럼이 없지만, `get_discover_cities`/`get_city_detail`과 두 테이블의 RLS가 전부 `discover_cities.is_active`를 게이트로 쓰므로 **승인 대기 도시(`is_active=false`)엔 바로 insert/upsert하고(어차피 게시 전엔 안 보임), 이미 게시 중인 도시엔 절대 쓰지 않고 JSON 리포트에만 제안을 남긴다.** 자동 저장도 "확정"은 아니다 — 월별 점수는 임시값(기본 3점), 명소 후보는 역/행정구역 등이 섞여 나올 수 있어 **도시를 "게시"로 전환하기 전에 반드시 이 화면에서 한 번 더 확인해야 한다.** 자세한 내용/한계는 그 폴더의 README 참고.
 
 ## 알려진 한계 / 다음에 할 수 있는 것
 

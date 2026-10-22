@@ -1,0 +1,14 @@
+{
+  "name": "collect-city-content",
+  "version": "1.0.0",
+  "private": true,
+  "description": "로컬에서 수동으로 실행하는 '어디로 떠나볼까요' 도시 월별 추천 이유/명소 후보 리포트 생성 스크립트 (triplog 앱 번들과 별개). DB에는 아무것도 쓰지 않는다 - 결과는 관리 페이지(/admin)에 손으로 옮기는 리포트 파일뿐이다.",
+  "type": "module",
+  "scripts": {
+    "months": "node collect-months.mjs",
+    "highlights": "node collect-highlights.mjs"
+  },
+  "dependencies": {
+    "@supabase/supabase-js": "^2.45.4"
+  }
+}

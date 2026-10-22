@@ -36,7 +36,8 @@ App activity / Device or other IDs) 기준입니다. "선택 제공"은 "이 데
 | Financial info | 지출 금액·통화·결제수단·카테고리 | 예 | 아니오 | 예(가계부 기능 자체가 선택) | 앱 기능 | 같은 여행 동행자끼리만 공유, 제3자 전달 없음 |
 | App activity | 여행/일정 데이터(제목, 목적지, 장소, 좌표, 메모, 시간) | 예 | 아니오 | 아니오(핵심 기능) | 앱 기능 | — |
 | App activity | 초대/멤버십 정보 | 예 | 아니오 | 예(동행자 초대 안 하면 해당 없음) | 앱 기능 | — |
-| **Device or other IDs** | **푸시 알림 토큰** | **예** | **예 — Firebase Cloud Messaging(Google), 안드로이드만** | **예(알림을 꺼도 다른 기능 이용 가능)** | **앱 기능(알림 발송)** | **아래 "푸시 알림 토큰" 절 참고 — 이번에 추가된 항목** |
+| **Device or other IDs** | **푸시 알림 토큰** | **예** | **예 — Firebase Cloud Messaging(Google), 안드로이드만** | **예(알림을 꺼도 다른 기능 이용 가능)** | **앱 기능(알림 발송)** | **아래 "푸시 알림 토큰" 절 참고** |
+| Personal info | 이메일 주소·문의 내용 | 예(선택) | 예 — Resend(이메일 발송 대행) | 예(1:1 문의하기를 쓰지 않으면 해당 없음) | 고객 지원 | 설정 > 고객센터 > 1:1 문의하기(`contactForm.js` → Edge Function `send-contact-email`) — 문의 제목·내용과 답장받을 이메일 주소만 전달됨 |
 | App info and performance | 접속 로그, 기기/브라우저 정보 | 예 | 아니오 | 아니오(일반적인 서버 접속 로그) | 분석, 보안 | Supabase 인프라 레벨의 일반적인 요청 로그 수준 |
 
 ## 푸시 알림 토큰 (신규)
@@ -62,6 +63,17 @@ App activity / Device or other IDs) 기준입니다. "선택 제공"은 "이 데
 - **관련 테이블**: `device_tokens`, `notification_settings`(알림 종류별 on/off), `notifications`(인앱
   발송 기록, 아직 읽음 처리 UI는 없음), `notification_log`(중복 발송 방지용, 사용자에게 노출되지 않음) —
   전부 `031_push_notifications.sql`.
+
+## 2026-10-18 Google Play 등록 준비 패스
+
+- `legalPages.js`의 개인정보처리방침이 `"초안이며 아직 시행되지 않았습니다"` placeholder에서 실제
+  시행일(2026년 10월 18일)·실제 보호책임자 연락처(lorddark01@gmail.com)로 바뀌었고, 섹션 6(처리위탁)에
+  Resend(1:1 문의 메일 발송)와 AviationStack(회원 개인 키로 직접 조회)이 추가됐습니다 — 위 표의 Resend
+  행과 "AviationStack" 언급은 그 변경을 반영한 것입니다.
+- 설정 > 개인정보 및 약관에 새 화면 **AI 및 외부 서비스 이용 안내**(`#/ai-usage`)가 생겼습니다 — 이
+  문서가 "Play Console 설문에 뭐라고 답할지" 정리본이라면, 그 화면은 "앱 안에서 사용자가 직접 읽는"
+  용도로 같은 목록(Gemini/Maps/FCM/AviationStack/Resend/Pexels 등, 출처 URL 포함)을 더 풀어서 보여줍니다
+  — 둘 중 하나가 바뀌면 다른 쪽도 같이 확인하세요.
 
 ## 아직 반영 안 된 것 / 확인 필요
 

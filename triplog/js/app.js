@@ -345,6 +345,7 @@
       "schedule",
       "invite",
       "budget",
+      "checklist",
       "wallet",
       "lodging",
       "notifications",
@@ -392,6 +393,7 @@
     router.beforeEnter("my-trip", requireTrip);
     router.beforeEnter("schedule", requireTrip);
     router.beforeEnter("budget", requireTrip);
+    router.beforeEnter("checklist", requireTrip);
     router.beforeEnter("wallet", requireTrip);
     router.beforeEnter("lodging", requireTrip);
 

@@ -18,7 +18,8 @@
    15. 여행지갑 (#/wallet/:id)  [WALLET] [WALLET-FORM] [WALLET-VIEWER]
    16. 여행 가져오기 창  [TRIP-IMPORT-MODAL]
    17. 여행 가져오기 미리보기 창  [TRIP-IMPORT-PREVIEW]
-   18. 관리 페이지 (/admin, SPA 밖 독립 페이지)  [ADMIN]
+   18. 체크리스트 (#/checklist/:id)  [CHECKLIST]
+   19. 관리 페이지 (/admin, SPA 밖 독립 페이지)  [ADMIN]
 */
 
 /* ==========================================================================
@@ -28,15 +29,16 @@
 :root {
   color-scheme: light;
 
-  /* 기본 색상 */
-  --page-bg: #f5f5f7;
-  /* 파스텔 블루 페이지 배경 - 최종적으로는 모든 화면에 적용할 예정이다. 메인 화면(body.has-main-bg)과
-     SHELL이 떠 있는 나의 여행·일정·가계부·여행지갑·숙소 다섯 화면(body.has-trip-shell)에 걸려 있고,
-     아직 옮기지 않은 화면은 --page-bg 그대로다. */
-  --page-bg-blue: #e8f1ff;
-  /* --page-bg-blue 위에 얹는 헤더·푸터·버튼 등 표면 색 - 페이지 배경보다 한 단계 더 진한 파스텔 블루다.
-     흰 --surface/회색 --surface-muted와 같은 자리(표면)에서, 파란 배경 위에 있을 때만 이걸 대신 쓴다. */
-  --surface-blue: #d6e4fb;
+  /* 기본 색상 - "클린 미니멀" 팔레트(요청, 전체 화면+팝업 공통, 앞으로 만드는 화면에도 기본값으로 적용).
+     레드 계열(--danger/--text-danger/--danger-pastel)은 이 교체 대상이 아니라 그대로 둔다. */
+  --page-bg: #f8fafc;
+  /* 모든 화면에 적용하는 옅은 쿨그레이 배경 - 메인 화면(body.has-main-bg)과 SHELL이 떠 있는 나의 여행·
+     일정·가계부·여행지갑·숙소 다섯 화면(body.has-trip-shell)도 같은 값을 쓰도록 --page-bg-blue를 맞춰
+     뒀다(과거엔 파란 배경이었지만 이 교체로 폐기, 토큰 이름만 호환을 위해 남겨 둔다). */
+  --page-bg-blue: #f8fafc;
+  /* 카드/헤더·푸터 표면은 전부 흰색(클린 미니멀 Card BG) - 과거 --surface-blue(파란 표면)도 같은 흰색으로
+     통일했다(토큰 이름만 호환을 위해 남겨 둔다). */
+  --surface-blue: #ffffff;
   --surface: #ffffff;
   --surface-muted: #f0f0f2;
   /* 폰트 컬러 정책 (아래 Conventions의 "폰트 컬러 정책" 참고): 검정 대신 --text(기본 글자), 제목/강조는
@@ -44,16 +46,19 @@
      버튼·배경·테두리 등 UI 전반에서 재사용되므로 색 자체는 바꾸지 않고, 글자색 전용으로 --text-accent(블루
      계열)/--text-danger(레드 계열)를 따로 둔다 - color: 선언에만 이 둘을 쓰고 background/border-color는
      그대로 --accent/--danger를 쓴다. */
-  --text: #26364a;
-  --text-soft: #1e293b;
-  --text-muted: #64748b;
+  --text: #111827;
+  --text-soft: #111827;
+  --text-muted: #6b7280;
   --text-faint: #94a3b8;
   --text-warm-muted: #7a5e4f; /* 따뜻한 파스텔톤 정책(아래 참고) 아래 새로 추가하는 보조 문구용 - 회색 계열 --text-* 대신 이 톤을 쓴다 */
   --disabled: #94a3b8;
   --border: #e2e2e5;
-  --accent: #007aff;
+  /* 블루 계열 버튼 색(요청, 참고 이미지 기준) - 공교롭게도 기존 --dday-pastel-bg와 같은 값이라 그 토큰은
+     그대로 둔다. 대비는 밝은 톤끼리라 WCAG AA 4.5:1에는 못 미치지만(흰 글자 기준), 참고 이미지가 이
+     조합을 그대로 쓰고 있어 파스텔 톤 우선 방향 그대로 적용한다. */
+  --accent: #8cb4ff;
   --danger: #ff3b30;
-  --text-accent: #3b82f6; /* 폰트 컬러 정책의 "블루 계열" - color: 전용, background/border-color는 --accent(#007aff) 그대로 */
+  --text-accent: #3b82f6; /* 폰트 컬러 정책의 "블루 계열" - color: 전용, background/border-color는 --accent(#8cb4ff) 그대로. 버튼 배경과 달리 글자색은 가독성을 위해 그대로 둔다 */
   --text-danger: #ff7b72; /* 폰트 컬러 정책의 "레드 계열" - color: 전용, background/border-color는 --danger(#ff3b30) 그대로 */
   /* 파스텔 톤 정책(아래 참고) 아래, 경고/위험 텍스트에 진한 --danger 대신 쓰는 파스텔 버전 - 맨 처음
      지정했던 D-day 배지 코랄(RGB(255,150,138))과 같은 색이라 앱 안에서 "파스텔 빨강"의 기준이 된다. */
@@ -151,7 +156,7 @@
   --content-max: 640px; /* 모바일→데스크톱 확장 시 콘텐츠가 갇히는 최대 폭 */
 
   /* 그림자 */
-  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.04); /* 클린 미니멀 카드 그림자(요청) */
   --shadow-md: 0 4px 14px rgba(0, 0, 0, 0.2);
 
   /* 겹침 순서: 여행 셸(고정 상단바·하단탭바) < 슬라이드 메뉴 < 모달 < 알럿 < 토스트 */
@@ -246,8 +251,8 @@ body {
   -webkit-tap-highlight-color: transparent;
 }
 
-/* 메인 화면(#/main)에 있는 동안만 파스텔 블루 배경 - mainPage.js가 router.onEnter/onLeave에서
-   여닫는다. 다른 화면은 아직 --page-bg(회색) 그대로다. */
+/* 메인 화면(#/main)에 있는 동안만 배경 클래스를 건다 - mainPage.js가 router.onEnter/onLeave에서 여닫는다.
+   값 자체는 이제 다른 화면과 같은 --page-bg-blue(클린 미니멀 배경, 위 TOKENS 참고)를 그대로 쓴다. */
 body.has-main-bg {
   background: var(--page-bg-blue);
 }
@@ -2216,8 +2221,9 @@ body.has-trip-shell {
   background: var(--surface-blue);
 }
 
-/* 등록 버튼만 파스텔 블루로 - 다른 화면의 .btn-save(진한 --accent)는 그대로 둔다(.lodging-map-search
-   .btn-save 등과 같은 토큰 재사용 방식) */
+/* --dday-pastel-bg를 직접 쓴다 - 지금은 --accent도 같은 값이라 결과는 동일하지만, 과거 --accent가 진한
+   파랑이던 시절부터 이 버튼만 파스텔로 구분해 온 자리라 토큰은 그대로 남겨 둔다(.lodging-map-search
+   .btn-save 등과 같은 재사용 방식) */
 .transport-modal .btn-save {
   background: var(--dday-pastel-bg);
 }
@@ -2490,7 +2496,7 @@ body.has-trip-shell {
   background: var(--surface-blue);
 }
 
-/* 이 화면의 "검색" 버튼만 파스텔 블루로 - 다른 화면의 .btn-save(진한 --accent)는 그대로 둔다 */
+/* --dday-pastel-bg를 직접 쓴다(지금은 --accent와 같은 값) - 위 .transport-modal .btn-save와 같은 이유로 토큰은 남겨 둔다 */
 .lodging-map-search .btn-save {
   background: var(--dday-pastel-bg);
 }
@@ -2671,6 +2677,23 @@ body.has-trip-shell {
 .simple-page-section-caret svg {
   width: 16px;
   height: 16px;
+}
+
+/* 도움말(#/help) 섹션 제목의 아이콘 - 다른 세 섹션 제목(글자만)과 달리 왼쪽에 작은 아이콘이 붙는다 */
+.simple-page-section-title-text {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+.simple-page-section-title-icon {
+  display: inline-flex;
+  color: var(--text-faint);
+}
+
+.simple-page-section-title-icon svg {
+  width: 20px;
+  height: 20px;
 }
 
 /* 펼친 상태면 ⌄가 위를 보게 180도 돌린다 */
@@ -3124,6 +3147,43 @@ body.has-trip-shell {
   cursor: pointer;
 }
 
+/* 대표 이미지(선택) - 없으면 travelFeed.js가 이 div 자체를 안 그려서 기존 모습 그대로다 */
+.feed-card-thumb {
+  position: relative;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  margin-bottom: var(--space-2);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+  background: var(--surface-muted);
+}
+
+.feed-card-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+/* 사진 출처 배지(요구사항: 리스트 썸네일에도 출처를 남겨야 한다) - 이미지 위 우하단 오버레이, 저작자/
+   출처 둘 다 없으면 travelFeed.js가 이 span 자체를 안 그린다. 카드 전체가 클릭 대상이라 링크는 넣지
+   않는다(상세 모달의 출처 줄만 링크) - 짧은 텍스트라 줄바꿈 없이 말줄임표로 자른다. */
+.feed-card-image-credit {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  max-width: calc(100% - 12px);
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: rgba(0, 0, 0, 0.5);
+  color: #ffffff;
+  font-size: 10px;
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 .feed-card-top {
   display: flex;
   flex-wrap: wrap;
@@ -3234,6 +3294,27 @@ body.has-trip-shell {
 }
 
 /* 상세 모달 - .modal-overlay/.modal을 그대로 쓰고(mainPage.js의 삭제 확인창과 같은 기반), 안쪽 내용만 */
+/* 대표 이미지(선택) - 없으면 travelFeed.js가 hidden을 건다(기존 모습 그대로) */
+.feed-detail-image {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: cover;
+  margin-bottom: 4px;
+  border-radius: var(--radius-md);
+}
+
+/* 사진 출처 표기 - 이미지 바로 아래, discover-detail-credit과 같은 톤(작고 흐린 텍스트 + 링크) */
+.feed-detail-image-credit {
+  margin: 0 0 var(--space-3);
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+.feed-detail-image-credit a {
+  color: var(--text-accent);
+}
+
 .feed-detail-top {
   display: flex;
   align-items: center;
@@ -4648,6 +4729,33 @@ button.member-stack {
   background: var(--page-bg);
 }
 
+/* MAIN-MENU 하단 공지사항·문의하기 - .mytrip-menu 세로 목록과 달리 한 줄에 나란히 두고,
+   margin-top:auto로 .mytrip-panel(flex column) 맨 아래에 붙인다 */
+.main-menu-links {
+  display: flex;
+  margin-top: auto;
+  padding-top: var(--space-2);
+  padding-bottom: var(--space-2);
+  border-top: 1px solid var(--border);
+}
+
+.main-menu-links button {
+  flex: 1;
+  min-height: 52px;
+  padding-inline: var(--space-5);
+  border: none;
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+  cursor: pointer;
+}
+
+.main-menu-links button:hover,
+.main-menu-links button:focus-visible {
+  background: var(--page-bg);
+}
+
 /* 로그아웃은 다른 메뉴와 구분선으로 떨어뜨리고 경고색으로 보여준다 */
 .mytrip-menu-logout {
   margin-top: var(--space-2);
@@ -5885,7 +5993,7 @@ body.has-trip-shell .toast {
   accent-color: var(--accent);
 }
 
-/* 이 팝업의 "저장" 버튼만 파스텔 블루로 - 다른 화면의 .btn-save(진한 --accent)는 그대로 둔다 */
+/* --dday-pastel-bg를 직접 쓴다(지금은 --accent와 같은 값) - 위 .transport-modal .btn-save와 같은 이유로 토큰은 남겨 둔다 */
 .wallet-form-modal .btn-save {
   background: var(--dday-pastel-bg);
 }
@@ -5953,6 +6061,12 @@ body.has-trip-shell .toast {
 
 .wallet-preview-pdf span {
   font-size: 28px;
+}
+
+.wallet-preview-status {
+  padding: var(--space-4);
+  color: var(--text-muted);
+  font-size: 14px;
 }
 
 .wallet-preview-clear {
@@ -6434,7 +6548,323 @@ body.has-trip-shell .toast {
 }
 
 /* ==========================================================================
-   18. 관리 페이지 (/admin, SPA 밖 독립 페이지)  [ADMIN]
+   18. 체크리스트 (#/checklist/:id)  [CHECKLIST]
+   가계부(.budget-*)와 같은 "고정 헤더 + .checklist-scroll만 스크롤" 구조. Day 대신 카테고리별로
+   묶고(.checklist-category, 접고 펼 수 있다 - 헤더 우측 상단 +로 더 추가하거나 헤더를 좌로 스와이프해
+   확인창을 거쳐 지울 수 있다), 항목은 체크박스(완료) + 스와이프 삭제(.budget-item-wrap과 같은 원리) +
+   끝의 ≡ 손잡이로 같은 카테고리 안에서 순서를 바꿀 수 있다.
+   ========================================================================== */
+
+.page[data-page="checklist"] {
+  position: fixed;
+  top: var(--shell-top-h); /* SHELL의 고정 상단바·하단탭바 사이로 비켜 앉는다 (.budget-shell과 같은 이유) */
+  bottom: var(--shell-bottom-h);
+  left: 0;
+  right: 0;
+  max-width: none;
+  padding: 0;
+  overflow: hidden;
+}
+
+.checklist-shell {
+  display: flex;
+  flex-direction: column;
+  width: 100%;
+  max-width: var(--content-max);
+  height: 100%;
+  margin-inline: auto;
+  background: var(--page-bg);
+}
+
+.checklist-header {
+  flex-shrink: 0;
+  padding: var(--space-4) var(--space-5);
+  background: var(--surface-blue);
+  border-bottom: 1px solid var(--border);
+}
+
+/* 제목/부제 왼쪽 + 카테고리 추가(+) 버튼 오른쪽 (요청: 우측 상단 +로 카테고리 추가) */
+.checklist-header-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.checklist-header-text {
+  min-width: 0;
+  overflow: hidden;
+}
+
+.checklist-title {
+  margin: 0;
+  font-size: 18px;
+  font-weight: 800;
+}
+
+.checklist-subtitle {
+  margin: 2px 0 0;
+  overflow: hidden;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* 클린 미니멀 베이스 팔레트의 파스텔 블루 accent - 데코/식별용 아이콘 버튼이라 파스텔 기본값을 따른다 */
+.checklist-category-add-btn {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: var(--tap-min);
+  height: var(--tap-min);
+  border: none;
+  border-radius: 50%;
+  background: var(--accent);
+  color: #ffffff;
+  cursor: pointer;
+}
+
+.checklist-scroll {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+  padding: var(--space-5);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+
+.checklist-loading {
+  padding: 64px 20px;
+  color: var(--text-muted);
+  font-size: 14px;
+  text-align: center;
+}
+
+.checklist-category {
+  flex-shrink: 0; /* .checklist-scroll(세로 flex)의 기본 flex-shrink:1을 끈다 - 안 끄면 항목이 많아 내용이
+    넘칠 때 스크롤되는 대신 각 카테고리가 억지로 눌려 찌그러진다(스크롤이 안 되는 것처럼 보이는 원인) */
+  border-radius: var(--radius-md);
+  background: var(--surface);
+  box-shadow: var(--shadow-sm);
+  overflow: hidden; /* 자식인 .checklist-category-header-wrap의 각진 모서리를 이 둥근 모서리에 맞춰 잘라낸다 */
+}
+
+/* 헤더만 따로 감싼다 - 좌로 스와이프하면 헤더 버튼 하나만 밀려 이 배경이 드러난다(본문이 열려 있어도
+   삭제 배경이 헤더 높이만큼만 보인다, 카드 전체 높이로 늘어나지 않는다). .checklist-item-wrap/-delete-bg와
+   같은 원리를 헤더 한 줄에만 적용한 것 - 자세한 이유는 checklistPage.js#categorySectionHtml 주석 참고. */
+.checklist-category-header-wrap {
+  position: relative;
+  overflow: hidden;
+}
+
+.checklist-category-delete-bg {
+  position: absolute;
+  inset: 3px; /* inset:0로 꽉 채우면 바깥 둥근 모서리(.checklist-category의 overflow:hidden+border-radius)
+    클리핑이 안티앨리어싱되며 경계선을 따라 빨간색이 살짝 비쳐 보인다 - .checklist-item-delete-bg와 같은
+    이유로 안쪽에 살짝 여백을 둔다 */
+  border-radius: calc(var(--radius-md) - 3px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: var(--space-5);
+  background: var(--danger);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  z-index: 0;
+}
+
+/* 카테고리 제목 줄 전체가 접기/펼치기 버튼이다 (commonPages.js의 .simple-page-section-title과 같은 패턴) */
+.checklist-category-header {
+  position: relative; /* .checklist-category-delete-bg(absolute) 위에 뜨려면 스스로도 위치 지정 요소여야 한다 */
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  width: 100%;
+  min-height: var(--tap-min);
+  padding: var(--space-3) var(--space-4);
+  border: none;
+  background: var(--surface); /* .checklist-category와 같은 배경 - 평소엔 바로 아래 delete-bg(빨강)를 완전히 가린다 */
+  font-family: inherit;
+  cursor: pointer;
+}
+
+.checklist-category-title {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  min-width: 0;
+  overflow: hidden;
+  font-size: 15px;
+  font-weight: 800;
+  color: var(--text);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  text-align: left;
+}
+
+.checklist-category-count {
+  flex-shrink: 0;
+  color: var(--text-muted);
+  font-size: 13px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}
+
+.checklist-category-caret {
+  flex-shrink: 0;
+  display: flex;
+  color: var(--text-faint);
+  transition: transform 0.2s ease;
+}
+
+/* 펼친 상태면 ⌄가 위를 보게 180도 돌린다 (.simple-page-section-caret과 같은 규칙) */
+.checklist-category-header[aria-expanded="true"] .checklist-category-caret {
+  transform: rotate(180deg);
+}
+
+.checklist-category-body {
+  padding: 0 var(--space-4) var(--space-4);
+}
+
+.checklist-empty {
+  margin: 0 0 var(--space-3);
+  padding: var(--space-4);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-md);
+  color: var(--text-muted);
+  font-size: 13px;
+  text-align: center;
+}
+
+.checklist-list {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  margin: 0 0 var(--space-3);
+  padding: 0;
+  list-style: none;
+}
+
+/* 드래그 중인 목록 - 자리를 바꾸는 동안 다른 항목들의 transform 전환만 보이면 되므로 특별한 배경은 없다 */
+.checklist-list--reordering {
+  cursor: grabbing;
+}
+
+/* 카드를 감싸서 스와이프 삭제를 담는다 - .budget-item-wrap과 완전히 같은 원리 */
+.checklist-item-wrap {
+  position: relative;
+  overflow: hidden;
+  border-radius: var(--radius-sm);
+}
+
+.checklist-item-wrap-placeholder {
+  border-radius: var(--radius-sm);
+}
+
+.checklist-item-delete-bg {
+  position: absolute;
+  inset: 3px;
+  border-radius: calc(var(--radius-sm) - 3px);
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  padding-right: var(--space-5);
+  background: var(--danger);
+  color: #ffffff;
+  font-size: 13px;
+  font-weight: 700;
+  z-index: 0;
+}
+
+.checklist-item {
+  position: relative; /* .checklist-item-delete-bg(absolute) 위에 뜨려면 스스로도 위치 지정 요소여야 한다 */
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-3);
+  background: var(--surface-muted);
+  border-radius: var(--radius-sm);
+  touch-action: pan-y; /* 세로 스크롤은 브라우저에게 맡기고, 가로 스와이프만 JS가 가져간다 */
+  cursor: pointer;
+}
+
+.checklist-item-checkbox {
+  flex-shrink: 0;
+  width: 20px;
+  height: 20px;
+  accent-color: var(--accent);
+}
+
+/* 요청: 길어지면 줄이지 않고 줄바꿈 - 고정 한 줄(ellipsis)이 아니라 내용에 맞춰 높이가 늘어난다.
+   body의 word-break: keep-all이 한글 단어가 중간에서 끊기는 것을 막아준다(전역 규칙, 여기서 또 안 건다). */
+.checklist-item-title {
+  flex: 1;
+  min-width: 0;
+  overflow-wrap: anywhere; /* 공백 없이 긴 영단어/URL 등 keep-all로도 못 줄바꿈하는 경우의 안전망 */
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+/* 완료 표시된 항목 - 줄긋기 + 흐리게 (새 색상 역할을 만들지 않고 --text-faint로만 구분) */
+.checklist-item--checked .checklist-item-title {
+  color: var(--text-faint);
+  text-decoration: line-through;
+}
+
+.checklist-item-handle {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  margin-right: calc(var(--space-3) * -1);
+  border: none;
+  background: transparent;
+  color: var(--text-faint);
+  cursor: grab;
+  touch-action: none; /* 손잡이를 누르면 곧바로 드래그가 시작된다 (세로 스크롤로 해석되지 않게 막는다) */
+}
+
+.checklist-add-btn {
+  min-height: var(--tap-min);
+  width: 100%;
+  padding-inline: var(--space-4);
+  border: 1px dashed var(--border);
+  border-radius: var(--radius-sm);
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.checklist-add-btn:hover,
+.checklist-add-btn:focus-visible {
+  border-color: var(--accent);
+  color: var(--text-accent);
+}
+
+/* [CHECKLIST-ADD-ITEM] "+ 추가하기"를 누르면 여는 작은 입력창 */
+.checklist-add-modal {
+  max-width: 360px;
+}
+
+.checklist-add-modal .search-input {
+  margin: var(--space-3) 0;
+}
+
+/* ==========================================================================
+   19. 관리 페이지 (/admin, SPA 밖 독립 페이지)  [ADMIN]
    ========================================================================== */
 /* admin.html은 index.html의 해시 라우터 밖에 있는 별도 정적 페이지지만(naver-callback.html/
    account-deletion.html과 같은 자리), 그 둘과 달리 이 파일을 그대로 불러와서 .wizard*/.pick-list/

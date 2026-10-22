@@ -127,6 +127,70 @@
           <input type="text" id="feed-source-url" placeholder="https://..." />
         </div>
 
+        <!-- 대표 이미지 (선택) - discover_city_images 쪽과 같은 "다운로드 없이 핫링크" 방식(URL만 저장) -->
+        <div class="form-field">
+          <label for="feed-image-url">대표 이미지 URL (선택)</label>
+          <div class="admin-city-preview-row">
+            <div class="admin-city-card-preview-tile" id="feed-image-preview"></div>
+          </div>
+          <input type="text" id="feed-image-url" placeholder="https://..." />
+          <div class="admin-feed-actions">
+            <button type="button" class="btn btn-cancel" id="feed-image-clear-btn">이미지 제거</button>
+          </div>
+
+          <!-- 출처 표기 - Unsplash/Wikimedia 검색 결과를 고르면 자동으로 채워진다(그대로 둬도 되고 고쳐도
+               된다). 직접 URL을 입력했다면 비어 있을 수 있다 - 그 경우 상세 화면은 출처 줄 자체를 숨긴다. -->
+          <p class="admin-hint">사진 출처 (검색 결과를 고르면 자동으로 채워져요, 직접 URL이면 비워도 돼요)</p>
+          <div class="admin-form-grid">
+            <div class="form-field">
+              <label for="feed-image-credit-name">사진작가/제공처</label>
+              <input type="text" id="feed-image-credit-name" placeholder="예: Jane Doe" />
+            </div>
+            <div class="form-field">
+              <label for="feed-image-credit-url">사진작가 링크 (선택, https만 허용)</label>
+              <input type="text" id="feed-image-credit-url" placeholder="https://..." />
+            </div>
+            <div class="form-field">
+              <label for="feed-image-license">라이선스</label>
+              <input type="text" id="feed-image-license" placeholder="예: CC BY-SA 4.0" />
+            </div>
+            <div class="form-field">
+              <label for="feed-image-source-name">출처 사이트 이름</label>
+              <input type="text" id="feed-image-source-name" placeholder="예: Wikimedia Commons" />
+            </div>
+          </div>
+          <div class="form-field">
+            <label for="feed-image-source-url">원본 URL (https만 허용)</label>
+            <input type="text" id="feed-image-source-url" placeholder="https://..." />
+          </div>
+
+          <h4 class="admin-city-subsection-title">Unsplash에서 검색</h4>
+          <p class="admin-hint">
+            다운로드 없이 Unsplash가 제공하는 주소를 그대로 사용합니다. 결과를 누르는 순간 Unsplash 쪽에
+            사용 사실을 1회 기록합니다(Unsplash API 이용약관이 요구하는 다운로드 트래킹).
+          </p>
+          <div class="admin-cities-toolbar">
+            <input type="text" id="feed-unsplash-search" class="search-input" placeholder="예: Tokyo cityscape" />
+            <button type="button" class="btn btn-cancel" id="feed-unsplash-search-btn">검색</button>
+          </div>
+          <ul class="admin-city-image-grid" id="feed-unsplash-results"></ul>
+          <p class="admin-empty" id="feed-unsplash-results-empty" hidden>검색 결과가 없어요.</p>
+          <p class="form-error" id="feed-unsplash-error" hidden></p>
+
+          <h4 class="admin-city-subsection-title">Wikimedia Commons에서 검색</h4>
+          <p class="admin-hint">
+            다운로드 없이 Wikimedia가 제공하는 주소를 그대로 사용합니다. 허용 라이선스(CC0/퍼블릭 도메인/
+            CC BY(-SA))와 저작자 표기가 있는 결과만 보여줍니다.
+          </p>
+          <div class="admin-cities-toolbar">
+            <input type="text" id="feed-wiki-search" class="search-input" placeholder="예: Tokyo cityscape" />
+            <button type="button" class="btn btn-cancel" id="feed-wiki-search-btn">검색</button>
+          </div>
+          <ul class="admin-city-image-grid" id="feed-wiki-results"></ul>
+          <p class="admin-empty" id="feed-wiki-results-empty" hidden>검색 결과가 없어요.</p>
+          <p class="form-error" id="feed-wiki-error" hidden></p>
+        </div>
+
         <p class="form-error" id="feed-form-error" hidden></p>
 
         <div class="modal-actions">
@@ -182,6 +246,10 @@
 
       <!-- ---- 목록 화면 ---- -->
       <div id="city-list-view">
+        <div class="tab-row tab-row--sub" id="city-status-tabs">
+          <button type="button" class="tab tab--active" data-status="pending">승인 대기</button>
+          <button type="button" class="tab" data-status="published">게시 중</button>
+        </div>
         <div class="admin-cities-toolbar">
           <label class="admin-check"><input type="checkbox" id="city-filter-not-this-month" /> 이번 달 추천 안 됨</label>
           <label class="admin-check"><input type="checkbox" id="city-filter-no-image" /> 이미지 없음</label>
@@ -385,7 +453,7 @@
     </section>
   </div>
 
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js" integrity="sha384-0w2KAL2YHP6wKOkUDzkCDGgVvfmHnj02DHeQ6XcHOgTfFsGyonKOpShMH1x6nk9o" crossorigin="anonymous"></script>
   <script src="js/supabaseClient.js"></script>
   <script src="js/adminPage.js"></script>
 </body>
