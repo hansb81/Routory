@@ -140,34 +140,61 @@ const RESPONSE_SCHEMA = {
   required: ["trip", "scheduleItems", "expenses"],
 };
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+// 허용 출처(2026-10-19 보안 점검 EDGE-07) - analyze-ticket과 동일한 이유/방식.
+const ALLOWED_ORIGINS = new Set([
+  "http://localhost:8080",
+  "https://triplog-nu.vercel.app",
+  "https://localhost",
+]);
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS_HEADERS, "Content-Type": "application/json; charset=utf-8" },
-  });
+function corsHeadersFor(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin") ?? req.headers.get("Origin");
+  return {
+    "Access-Control-Allow-Origin": origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://triplog-nu.vercel.app",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
 }
 
-const fail = () => json({ error: FAIL_MESSAGE });
-
 // ---- 로그인 확인 ----
-// Supabase가 서명을 이미 확인한 토큰(verify_jwt)이라 payload의 role만 본다.
+// Supabase가 서명을 이미 확인한 토큰(verify_jwt)이라 payload의 role/sub만 본다.
 // 앱에 공개돼 있는 anon 키만으로는 호출할 수 없게 해서, 누구나 Gemini 사용량을 쓰지 못하게 한다.
-function isSignedIn(req: Request): boolean {
+function authClaims(req: Request): { authenticated: boolean; userId: string | null } {
   try {
     const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
     const payload = token.split(".")[1];
-    if (!payload) return false;
+    if (!payload) return { authenticated: false, userId: null };
     const padded = payload.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(payload.length / 4) * 4, "=");
-    return JSON.parse(atob(padded)).role === "authenticated";
+    const claims = JSON.parse(atob(padded));
+    return { authenticated: claims.role === "authenticated", userId: typeof claims.sub === "string" ? claims.sub : null };
   } catch {
-    return false;
+    return { authenticated: false, userId: null };
   }
+}
+
+// ---- 남용 방지: 사용자당 분당 호출 상한 (search-destination#checkRateLimit과 같은 방식) ----
+// 로그인 확인만으로는 한 계정이 Gemini 호출(유료 API)을 무제한 반복하는 것을 막지 못한다 - 함수 인스턴스
+// 메모리에만 두는 best-effort 제한이다(콜드 스타트·다중 인스턴스에서는 실제 상한이 설정값보다 높아질 수
+// 있다 - 엄격한 보장이 필요해지면 Postgres 테이블 기반 리미터로 바꿔야 한다).
+const RATE_LIMIT_PER_MINUTE = 10; // 조정 지점
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const rateLimitMap = new Map<string, { windowStart: number; count: number }>();
+
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  if (Math.random() < 0.01) {
+    for (const [key, entry] of rateLimitMap) {
+      if (now - entry.windowStart > RATE_LIMIT_WINDOW_MS * 2) rateLimitMap.delete(key);
+    }
+  }
+  const entry = rateLimitMap.get(userId);
+  if (!entry || now - entry.windowStart >= RATE_LIMIT_WINDOW_MS) {
+    rateLimitMap.set(userId, { windowStart: now, count: 1 });
+    return true;
+  }
+  entry.count += 1;
+  return entry.count <= RATE_LIMIT_PER_MINUTE;
 }
 
 // ---- 입력(이미지/파일 base64 + 텍스트, 둘 다 올 수도 있다) ----
@@ -412,9 +439,20 @@ function toResult(raw: unknown) {
 // ---- 요청 처리 ----
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  const CORS_HEADERS = corsHeadersFor(req);
+  function json(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json; charset=utf-8" },
+    });
+  }
+  const fail = () => json({ error: FAIL_MESSAGE });
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
   if (req.method !== "POST") return json({ error: "POST 요청만 받아요" }, 405);
-  if (!isSignedIn(req)) return json({ error: "로그인이 필요해요" }, 401);
+  const { authenticated, userId } = authClaims(req);
+  if (!authenticated || !userId) return json({ error: "로그인이 필요해요" }, 401);
+  if (!checkRateLimit(userId)) return json({ error: "너무 자주 호출했어요. 잠시 뒤 다시 시도해주세요" }, 429);
 
   const body = (await req.json().catch(() => null)) as Record<string, unknown> | null;
   if (typeof body !== "object" || body === null) return json({ error: "imageBase64 또는 text 중 하나를 보내주세요" }, 400);

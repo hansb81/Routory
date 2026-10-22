@@ -53,9 +53,10 @@ captures/
 .idea/navEditor.xml
 
 # Keystore files
-# Uncomment the following lines if you do not want to check your keystore files in.
-#*.jks
-#*.keystore
+# 2026-10-19 보안 점검 SEC-03: 릴리스 서명 키스토어를 실수로 커밋하지 않도록 기본값을 "제외"로 바꿔 둔다.
+# 이 키스토어를 git으로 관리하고 싶다면(권장하지 않음) 아래 두 줄을 다시 주석 처리한다.
+*.jks
+*.keystore
 
 # External native build folder generated in Android Studio 2.2 and later
 .externalNativeBuild

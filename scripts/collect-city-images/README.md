@@ -68,7 +68,7 @@ npm install
 ## 실행
 
 ```bash
-# 활성 도시 전체(027/discover_cities_seed.sql이 넣어 둔 27개) 처리, 도시당 최대 5개 후보
+# discover_cities 전체(승인 대기 + 게시 중) 처리, 도시당 최대 5개 후보
 node collect.mjs
 
 # 미리보기만(DB/Storage에 아무것도 쓰지 않음)

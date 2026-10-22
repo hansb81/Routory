@@ -27,6 +27,18 @@
       .replace(/'/g, "&#39;");
   }
 
+  // href에 그대로 쓸 URL인지 확인한다 - escapeHtml()은 &<>"'만 이스케이프할 뿐 javascript:/data: 같은
+  // 스킴은 걸러내지 않는다. http(s)가 아니면 빈 문자열을 돌려준다(호출한 쪽은 링크 없이 평문으로 대체).
+  function safeHttpUrl(value) {
+    if (typeof value !== "string" || !value) return "";
+    try {
+      const url = new URL(value);
+      return url.protocol === "http:" || url.protocol === "https:" ? value : "";
+    } catch {
+      return "";
+    }
+  }
+
   function truncate(str, n) {
     if (!str) return "";
     return str.length > n ? str.slice(0, n) + "…" : str;
@@ -93,7 +105,9 @@
         showNotFound();
         return;
       }
-      const { data: isAdmin, error } = await supabase.rpc("is_admin");
+      // 2026-10-19 보안 점검 RLS-01: is_admin(uuid)는 service_role 전용으로 좁히고(040_is_admin_self_only.sql),
+      // 로그인한 사용자 "본인" 확인은 인자 없는 is_admin_self()로 분리했다.
+      const { data: isAdmin, error } = await supabase.rpc("is_admin_self");
       if (error || !isAdmin) {
         showNotFound();
         return;
@@ -119,6 +133,7 @@
       editingFeedId: null,
       adminLabels: new Map(),
       cities: [], // 추천 도시 목록(필터 적용 전 원본) - discover_cities + destinations + 집계값
+      cityStatus: "pending", // "pending"(승인 대기, is_active=false) | "published"(게시 중, is_active=true) - city-status-tabs
       cityFilter: { notThisMonth: false, noImage: false },
       selectedCityId: null,
       selectedCityDest: null, // { name_ko, name_en, country_code } - destinations 쪽 값
@@ -223,6 +238,241 @@
       }
     }
 
+    function feedImagePreviewHtml(url) {
+      return url ? '<img src="' + escapeHtml(url) + '" alt="" loading="lazy" />' : "";
+    }
+
+    // 출처 표기(요구사항: "사진 출처도 남겨줘야 한다") - Unsplash/Wikimedia 둘 다 사진을 쓸 때 저작자/출처
+    // 표기가 필요하다(특히 Wikimedia의 CC BY(-SA)는 저작자 표기가 라이선스 조건이다). 검색 결과를 고르면
+    // 자동으로 채우고, 직접 입력한 URL이면 빈 채로 둔다(관리자가 손으로 채울 수도 있다).
+    function setFeedImageCredit(credit) {
+      const c = credit || {};
+      qs("#feed-image-credit-name").value = c.creditName || "";
+      qs("#feed-image-credit-url").value = c.creditUrl || "";
+      qs("#feed-image-license").value = c.license || "";
+      qs("#feed-image-source-name").value = c.sourceName || "";
+      qs("#feed-image-source-url").value = c.sourceUrl || "";
+    }
+
+    // 직접 URL을 입력했을 때(검색을 거치지 않아 특정 사진 페이지 출처까지는 모른다) 호스트만 보고
+    // 알려진 서비스인지 먼저 체크해준다 - 맞으면 그 서비스의 대표 사이트 주소라도 출처로 남기고
+    // (완전히 빈 칸보다는 "최소한 어디서 왔는지"), 모르는 호스트면 기존대로 비워서 관리자가 직접 채우게
+    // 한다. 특정 사진 한 장의 정확한 출처 페이지(저작자 이름 등)는 이 방식으로는 알 수 없다 - 그게
+    // 필요하면 검색 결과를 쓴다.
+    const KNOWN_IMAGE_HOSTS = [
+      { test: /(^|\.)unsplash\.com$/i, sourceName: "Unsplash", sourceUrl: "https://unsplash.com" },
+      { test: /(^|\.)wikimedia\.org$/i, sourceName: "Wikimedia Commons", sourceUrl: "https://commons.wikimedia.org" },
+      { test: /(^|\.)pexels\.com$/i, sourceName: "Pexels", sourceUrl: "https://www.pexels.com" },
+    ];
+
+    function guessImageSourceFromUrl(url) {
+      try {
+        const host = new URL(url).hostname;
+        const hit = KNOWN_IMAGE_HOSTS.find((h) => h.test.test(host));
+        return hit ? { sourceName: hit.sourceName, sourceUrl: hit.sourceUrl } : null;
+      } catch {
+        return null;
+      }
+    }
+
+    // 입력칸 자체의 input 이벤트에서는 value를 되읽어 쓰지 않는다 - 타이핑 중 커서가 끝으로 튀는 문제를
+    // 피하려고, 그 경우엔 미리보기만 갱신한다(아래 리스너). setFeedImageUrl은 검색 결과 클릭/초기화/
+    // 폼 열기처럼 값을 "대신 채워주는" 모든 경로가 공유한다.
+    function setFeedImageUrl(url, credit) {
+      qs("#feed-image-url").value = url || "";
+      qs("#feed-image-preview").innerHTML = feedImagePreviewHtml(url);
+      setFeedImageCredit(credit);
+    }
+    qs("#feed-image-url").addEventListener("input", () => {
+      const url = qs("#feed-image-url").value.trim();
+      qs("#feed-image-preview").innerHTML = feedImagePreviewHtml(url);
+      // 직접 타이핑으로 URL이 바뀌면 직전에 자동으로 채워진 출처는 더 이상 이 이미지의 것이 아닐 수
+      // 있다 - 먼저 호스트로 알려진 서비스인지 체크해서 맞으면 그 서비스 메인 사이트를 출처로 남기고,
+      // 모르는 호스트면 비운다(엉뚱한 사진에 엉뚱한 출처가 남지 않게 - 관리자가 손으로 채울 수 있다).
+      setFeedImageCredit(guessImageSourceFromUrl(url));
+    });
+    qs("#feed-image-clear-btn").addEventListener("click", () => setFeedImageUrl(""));
+
+    // ---- Unsplash에서 검색 (search-unsplash Edge Function, "추천 도시" 탭과 같은 함수를 재사용) ----
+    qs("#feed-unsplash-search-btn").addEventListener("click", async () => {
+      const q = qs("#feed-unsplash-search").value.trim();
+      const resultsEl = qs("#feed-unsplash-results");
+      const emptyEl = qs("#feed-unsplash-results-empty");
+      const errEl = qs("#feed-unsplash-error");
+      resultsEl.innerHTML = "";
+      emptyEl.hidden = true;
+      errEl.hidden = true;
+      if (!q) return;
+      try {
+        const { data, error } = await supabase.functions.invoke("search-unsplash", { body: { query: q } });
+        if (error) throw error;
+        if (data?.error) throw new Error(data.error);
+        const results = data?.results || [];
+        resultsEl.dataset.resultsJson = JSON.stringify(results);
+        if (results.length === 0) {
+          emptyEl.hidden = false;
+          return;
+        }
+        resultsEl.innerHTML = results
+          .map(
+            (r, i) =>
+              '<li class="admin-city-image-card" data-index="' +
+              i +
+              '"><img src="' +
+              escapeHtml(r.thumbUrl || r.imageUrl) +
+              '" alt="" loading="lazy" />' +
+              '<p class="admin-city-image-credit">사진: ' +
+              escapeHtml(r.creditName) +
+              "</p>" +
+              '<div class="admin-city-image-actions">' +
+              '<button type="button" class="btn btn-save" data-index="' +
+              i +
+              '">이 사진 쓰기</button></div></li>'
+          )
+          .join("");
+      } catch (err) {
+        console.warn("[admin] Unsplash 검색 실패", err);
+        errEl.textContent = "검색하지 못했어요: " + (err.message || "");
+        errEl.hidden = false;
+      }
+    });
+
+    qs("#feed-unsplash-results").addEventListener("click", async (e) => {
+      const btn = e.target.closest("button[data-index]");
+      if (!btn) return;
+      const results = JSON.parse(qs("#feed-unsplash-results").dataset.resultsJson || "[]");
+      const r = results[Number(btn.dataset.index)];
+      if (!r) return;
+      setFeedImageUrl(r.imageUrl, {
+        creditName: r.creditName,
+        creditUrl: r.creditUrl || "",
+        license: r.license || "Unsplash License",
+        sourceName: "Unsplash",
+        sourceUrl: r.sourceUrl || "",
+      });
+      // Unsplash 이용약관: "사용"으로 고른 시점에 다운로드 트래킹 1회 (search-unsplash#handleTrackDownload) -
+      // best-effort라 실패해도 이미지 선택 자체는 그대로 둔다.
+      try {
+        await supabase.functions.invoke("search-unsplash", { body: { downloadLocation: r.downloadLocation } });
+      } catch (err) {
+        console.warn("[admin] Unsplash 다운로드 트래킹 실패", err);
+      }
+    });
+
+    // ---- Wikimedia Commons에서 검색 (city-wiki-* 와 같은 필터링 규칙·호출 방식, feed 폼 전용 id) ----
+    const FEED_WIKI_API_URL = "https://commons.wikimedia.org/w/api.php";
+    const FEED_WIKI_SEARCH_LIMIT = 8;
+    const FEED_WIKI_THUMB_WIDTH = 800;
+
+    function isAllowedFeedWikiLicense(licenseShortName) {
+      if (!licenseShortName) return false;
+      const s = licenseShortName.toLowerCase();
+      if (s.includes("nc") || s.includes("nd") || s.includes("non-commercial") || s.includes("no derivative")) return false;
+      return /cc0|public domain|cc[- ]?by(-sa)?/.test(s);
+    }
+
+    function stripFeedWikiHtml(value) {
+      if (!value) return "";
+      return value
+        .replace(/<[^>]*>/g, "")
+        .replace(/&amp;/g, "&")
+        .replace(/&quot;/g, '"')
+        .replace(/&#39;/g, "'")
+        .trim();
+    }
+
+    async function searchFeedWikimedia(query) {
+      const params = new URLSearchParams({
+        action: "query",
+        format: "json",
+        origin: "*",
+        generator: "search",
+        gsrsearch: query,
+        gsrnamespace: "6",
+        gsrlimit: String(FEED_WIKI_SEARCH_LIMIT),
+        prop: "imageinfo",
+        iiprop: "url|size|extmetadata|mime",
+        iiurlwidth: String(FEED_WIKI_THUMB_WIDTH),
+      });
+      const res = await fetch(FEED_WIKI_API_URL + "?" + params.toString());
+      if (!res.ok) throw new Error("Wikimedia 요청 실패 HTTP " + res.status);
+      const data = await res.json();
+      const pages = data?.query?.pages;
+      if (!pages) return [];
+      const results = [];
+      for (const page of Object.values(pages)) {
+        const info = page?.imageinfo?.[0];
+        if (!info || !info.url) continue;
+        if (!/^image\//.test(info.mime || "")) continue;
+        const meta = info.extmetadata || {};
+        const license = meta.LicenseShortName?.value || "";
+        if (!isAllowedFeedWikiLicense(license)) continue;
+        const artist = stripFeedWikiHtml(meta.Artist?.value);
+        if (!artist) continue;
+        const thumbUrl = info.thumburl || info.url;
+        const fileUrl = "https://commons.wikimedia.org/wiki/" + encodeURIComponent(page.title.replace(/ /g, "_"));
+        results.push({ imageUrl: thumbUrl, creditName: artist, license, sourceUrl: fileUrl });
+      }
+      return results;
+    }
+
+    qs("#feed-wiki-search-btn").addEventListener("click", async () => {
+      const q = qs("#feed-wiki-search").value.trim();
+      const resultsEl = qs("#feed-wiki-results");
+      const emptyEl = qs("#feed-wiki-results-empty");
+      const errEl = qs("#feed-wiki-error");
+      resultsEl.innerHTML = "";
+      emptyEl.hidden = true;
+      errEl.hidden = true;
+      if (!q) return;
+      try {
+        const results = await searchFeedWikimedia(q);
+        resultsEl.dataset.resultsJson = JSON.stringify(results);
+        if (results.length === 0) {
+          emptyEl.hidden = false;
+          return;
+        }
+        resultsEl.innerHTML = results
+          .map(
+            (r, i) =>
+              '<li class="admin-city-image-card" data-index="' +
+              i +
+              '"><img src="' +
+              escapeHtml(r.imageUrl) +
+              '" alt="" loading="lazy" />' +
+              '<p class="admin-city-image-credit">사진: ' +
+              escapeHtml(r.creditName) +
+              " · " +
+              escapeHtml(r.license) +
+              "</p>" +
+              '<div class="admin-city-image-actions">' +
+              '<button type="button" class="btn btn-save" data-index="' +
+              i +
+              '">이 사진 쓰기</button></div></li>'
+          )
+          .join("");
+      } catch (err) {
+        console.warn("[admin] Wikimedia 검색 실패", err);
+        errEl.textContent = "검색하지 못했어요: " + (err.message || "");
+        errEl.hidden = false;
+      }
+    });
+
+    qs("#feed-wiki-results").addEventListener("click", (e) => {
+      const btn = e.target.closest("button[data-index]");
+      if (!btn) return;
+      const results = JSON.parse(qs("#feed-wiki-results").dataset.resultsJson || "[]");
+      const r = results[Number(btn.dataset.index)];
+      if (!r) return;
+      setFeedImageUrl(r.imageUrl, {
+        creditName: r.creditName,
+        creditUrl: "",
+        license: r.license,
+        sourceName: "Wikimedia Commons",
+        sourceUrl: r.sourceUrl || "",
+      });
+    });
+
     function renderFeedItem(row) {
       const badges = [
         '<span class="admin-badge">' + (row.kind === "safety" ? "안전" : "혜택") + "</span>",
@@ -253,19 +503,24 @@
           ? '<p class="pick-sub">수집: ' +
             formatDateTime(row.created_at) +
             ' · <a href="' +
-            escapeHtml(row.source_url) +
-            '" target="_blank" rel="noopener">원문 보기</a></p>'
+            escapeHtml(safeHttpUrl(row.source_url)) +
+            '" target="_blank" rel="noopener noreferrer">원문 보기</a></p>'
           : "";
+
+      const thumbHtml = row.image_url
+        ? '<div class="pick-thumb"><img src="' + escapeHtml(row.image_url) + '" alt="" loading="lazy" /></div>'
+        : "";
 
       return (
         '<li class="pick-item" data-id="' + row.id + '">' +
+        thumbHtml +
         '<div class="pick-info">' +
         '<div class="admin-feed-badges">' + badges.join("") + "</div>" +
         '<p class="pick-name">' + escapeHtml(row.title) + "</p>" +
         '<p class="pick-sub">' + escapeHtml(truncate(row.summary, 80)) + "</p>" +
         '<p class="pick-sub">출처: <a href="' +
-        escapeHtml(row.source_url) +
-        '" target="_blank" rel="noopener">' +
+        escapeHtml(safeHttpUrl(row.source_url)) +
+        '" target="_blank" rel="noopener noreferrer">' +
         escapeHtml(row.source_name) +
         "</a></p>" +
         autoLine +
@@ -338,6 +593,7 @@
     function openFeedFormForCreate() {
       state.editingFeedId = null;
       feedForm.reset();
+      setFeedImageUrl("");
       qs("#feed-form-title").textContent = "새 소식 등록";
       qs("#feed-published-at").value = todayStr();
       toggleValidFields();
@@ -364,6 +620,13 @@
       qs("#feed-action-tip").value = row.action_tip || "";
       qs("#feed-source-name").value = row.source_name || "";
       qs("#feed-source-url").value = row.source_url || "";
+      setFeedImageUrl(row.image_url || "", {
+        creditName: row.image_credit_name || "",
+        creditUrl: row.image_credit_url || "",
+        license: row.image_license || "",
+        sourceName: row.image_source_name || "",
+        sourceUrl: row.image_source_url || "",
+      });
       toggleValidFields();
       updateSummaryCount();
       hideFeedFormError();
@@ -376,6 +639,15 @@
       feedForm.reset();
       state.editingFeedId = null;
       hideFeedFormError();
+      setFeedImageUrl("");
+      ["#feed-unsplash-results", "#feed-wiki-results"].forEach((sel) => {
+        qs(sel).innerHTML = "";
+        delete qs(sel).dataset.resultsJson;
+      });
+      qs("#feed-unsplash-results-empty").hidden = true;
+      qs("#feed-wiki-results-empty").hidden = true;
+      qs("#feed-unsplash-error").hidden = true;
+      qs("#feed-wiki-error").hidden = true;
     }
 
     qs("#feed-new-btn").addEventListener("click", openFeedFormForCreate);
@@ -398,6 +670,12 @@
         valid_to: kind === "benefit" ? qs("#feed-valid-to").value || null : null,
         source_name: qs("#feed-source-name").value.trim(),
         source_url: qs("#feed-source-url").value.trim(),
+        image_url: qs("#feed-image-url").value.trim() || null,
+        image_credit_name: qs("#feed-image-credit-name").value.trim() || null,
+        image_credit_url: qs("#feed-image-credit-url").value.trim() || null,
+        image_license: qs("#feed-image-license").value.trim() || null,
+        image_source_name: qs("#feed-image-source-name").value.trim() || null,
+        image_source_url: qs("#feed-image-source-url").value.trim() || null,
       };
     }
 
@@ -409,6 +687,9 @@
       if (!p.source_name) return "출처 이름을 입력해주세요.";
       if (!p.source_url) return "출처 URL을 입력해주세요.";
       if (!isHttpsUrl(p.source_url)) return "출처 URL은 https://로 시작해야 해요.";
+      if (p.image_url && !isHttpsUrl(p.image_url)) return "대표 이미지 URL은 https://로 시작해야 해요.";
+      if (p.image_credit_url && !isHttpsUrl(p.image_credit_url)) return "사진작가 링크는 https://로 시작해야 해요.";
+      if (p.image_source_url && !isHttpsUrl(p.image_source_url)) return "원본 URL은 https://로 시작해야 해요.";
       return null;
     }
 
@@ -728,8 +1009,8 @@
         escapeHtml(img.license) +
         "</p>" +
         '<p class="admin-city-image-source"><a href="' +
-        escapeHtml(img.source_url) +
-        '" target="_blank" rel="noopener">' +
+        escapeHtml(safeHttpUrl(img.source_url)) +
+        '" target="_blank" rel="noopener noreferrer">' +
         escapeHtml(img.source_name) +
         " 원본 보기</a></p>"
       );
@@ -786,23 +1067,27 @@
     }
 
     function renderCityList() {
-      let rows = state.cities;
+      let rows = state.cities.filter((c) => c.isActive === (state.cityStatus === "published"));
       if (state.cityFilter.notThisMonth) rows = rows.filter((c) => !c.thisMonth);
       if (state.cityFilter.noImage) rows = rows.filter((c) => !c.hasImage);
 
       if (rows.length === 0) {
         cityListEl.innerHTML = "";
         cityListEmptyEl.hidden = false;
+        cityListEmptyEl.textContent =
+          state.cityStatus === "published" ? "게시 중인 도시가 없어요." : "승인 대기 중인 도시가 없어요.";
         return;
       }
       cityListEmptyEl.hidden = true;
       cityListEl.innerHTML = rows
         .map((c) => {
           const badges = [
-            '<span class="admin-badge' + (c.isActive ? "" : " admin-badge--auto") + '">' + (c.isActive ? "활성" : "비활성") + "</span>",
+            '<span class="admin-badge' + (c.isActive ? "" : " admin-badge--auto") + '">' + (c.isActive ? "게시중" : "승인 대기") + "</span>",
             '<span class="admin-badge' + (c.hasImage ? "" : " admin-badge--auto") + '">' + (c.hasImage ? "이미지 있음" : "이미지 없음") + "</span>",
           ];
           const monthLabel = c.thisMonth ? "이번 달 " + c.thisMonth.score + "점 · " + escapeHtml(c.thisMonth.reason_tag || "") : "이번 달 추천 안 됨";
+          const toggleLabel = c.isActive ? "승인 대기로 전환" : "게시";
+          const toggleClass = c.isActive ? "btn-cancel" : "btn-save";
           return (
             '<li class="pick-item" data-city-id="' +
             c.id +
@@ -821,13 +1106,31 @@
             " · 하이라이트 " +
             c.highlightCount +
             "개</p></div>" +
+            '<div class="admin-feed-actions">' +
+            '<button type="button" class="btn ' +
+            toggleClass +
+            '" data-action="toggle-status" data-city-id="' +
+            c.id +
+            '">' +
+            toggleLabel +
+            "</button>" +
             '<button type="button" class="btn btn-cancel pick-btn" data-city-id="' +
             c.id +
-            '">열기</button></li>'
+            '">열기</button>' +
+            "</div></li>"
           );
         })
         .join("");
     }
+
+    qsa("#city-status-tabs .tab").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        qsa("#city-status-tabs .tab").forEach((b) => b.classList.remove("tab--active"));
+        btn.classList.add("tab--active");
+        state.cityStatus = btn.dataset.status;
+        renderCityList();
+      });
+    });
 
     qs("#city-filter-not-this-month").addEventListener("change", (e) => {
       state.cityFilter.notThisMonth = e.target.checked;
@@ -838,9 +1141,19 @@
       renderCityList();
     });
 
-    cityListEl.addEventListener("click", (e) => {
+    cityListEl.addEventListener("click", async (e) => {
       const target = e.target.closest("[data-city-id]");
-      if (target) openCityDetail(target.dataset.cityId);
+      if (!target) return;
+      const id = target.dataset.cityId;
+      if (target.dataset.action === "toggle-status") {
+        const city = state.cities.find((c) => c.id === id);
+        if (!city) return;
+        const nextActive = !city.isActive;
+        const { error } = await supabase.from("discover_cities").update({ is_active: nextActive }).eq("id", id);
+        if (error) return window.alert("상태를 바꾸지 못했어요: " + error.message);
+        return loadCityList();
+      }
+      openCityDetail(id);
     });
 
     // ---- 도시 추가 (요청 2번: PRD v12 도시 검색 → select로 확정 → discover_cities에 연결) ----
@@ -924,9 +1237,11 @@
         if (error || data?.error || !data?.result) throw new Error(data?.error || error?.message || "도시 확정에 실패했어요.");
         const destinationId = data.result.id;
 
+        // 새로 추가한 도시는 바로 게시하지 않고 승인 대기로 들어간다 - 콘텐츠(이미지·월별 추천 이유·
+        // 하이라이트)를 채운 뒤 목록에서 "게시"를 눌러야 메인 화면 후보에 들어간다(검수 단계 강제).
         const { data: upserted, error: upsertErr } = await supabase
           .from("discover_cities")
-          .upsert({ destination_id: destinationId, is_active: true }, { onConflict: "destination_id" })
+          .upsert({ destination_id: destinationId, is_active: false }, { onConflict: "destination_id" })
           .select("id")
           .single();
         if (upsertErr) throw upsertErr;

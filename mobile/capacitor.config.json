@@ -1,6 +1,6 @@
 {
   "appId": "com.teamsdb.routory",
-  "appName": "TripLog",
+  "appName": "Routory",
   "webDir": "../triplog",
   "plugins": {
     "SplashScreen": {

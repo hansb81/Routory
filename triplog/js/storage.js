@@ -44,6 +44,12 @@
   let walletItemsCache = []; // 불러온 여행들의 지갑 문서 (item.tripId로 구분, expensesCache와 같은 모양)
   const walletItemsLoadedTrips = new Set(); // 지갑 문서를 불러온 여행 id
   const walletItemsRequestIds = new Map();
+  let checklistCache = []; // 불러온 여행들의 체크리스트 항목 (item.tripId로 구분, expensesCache와 같은 모양)
+  const checklistLoadedTrips = new Set(); // 체크리스트를 불러온 여행 id
+  const checklistRequestIds = new Map();
+  let checklistCategoriesCache = []; // 불러온 여행들의 체크리스트 카테고리 (category.tripId로 구분, checklistCache와 같은 모양)
+  const checklistCategoriesLoadedTrips = new Set();
+  const checklistCategoriesRequestIds = new Map();
   let consentCache = null; // 로그인한 사용자의 user_consents 행 (없으면 null - 아직 한 번도 동의하지 않았다는 뜻)
   let consentLoaded = false; // 서버에 한 번이라도 성공적으로 확인했는가 (hasConsent()의 기본값을 가르는 플래그, 아래 참고)
   let consentRequestId = 0;
@@ -390,6 +396,12 @@
     walletItemsCache = walletItemsCache.filter((item) => item.tripId !== id);
     walletItemsLoadedTrips.delete(id);
     walletItemsRequestIds.delete(id);
+    checklistCache = checklistCache.filter((item) => item.tripId !== id);
+    checklistLoadedTrips.delete(id);
+    checklistRequestIds.delete(id);
+    checklistCategoriesCache = checklistCategoriesCache.filter((cat) => cat.tripId !== id);
+    checklistCategoriesLoadedTrips.delete(id);
+    checklistCategoriesRequestIds.delete(id);
     if (currentTripId === id) currentTripId = null;
     notify();
   }
@@ -513,6 +525,219 @@
     if (error) throw fail(error, "지출 삭제");
     expensesCache = expensesCache.filter((expense) => expense.id !== id);
     return Boolean(data && data.length);
+  }
+
+  // ---- 체크리스트(ChecklistCategory, ChecklistItem) ----
+  // expenses(가계부)와 같은 "그 여행 멤버면 서로의 항목도 보고 고친다" 공유 모델, 같은 캐시 모양.
+  // 카테고리도 trip마다 따로 있는 행(checklist_categories)이라 항목과 똑같이 불러오고 캐시한다 - "+"로
+  // 추가하거나 스와이프로 지울 수 있다(지우면 그 안의 항목도 서버에서 on delete cascade로 같이 지워지므로
+  // deleteChecklistCategory가 캐시에서도 항목을 같이 걷어낸다). 기본 카테고리·항목 시딩(ensureChecklistSeeded)만
+  // 이 기능 고유의 것 - checklist_seeds 마커 테이블(038_checklist.sql) 설명 참고.
+
+  function rowToChecklistCategory(row) {
+    return {
+      id: row.id,
+      tripId: row.trip_id,
+      label: row.label,
+      sortOrder: typeof row.sort_order === "number" ? row.sort_order : 0, // 같은 trip_id 안에서만 의미 있는 순서 (카테고리 나열 순서)
+      createdBy: row.created_by ?? null,
+      createdAt: row.created_at,
+    };
+  }
+
+  async function loadChecklistCategories(tripId) {
+    if (!tripId) return [];
+    const requestId = (checklistCategoriesRequestIds.get(tripId) ?? 0) + 1;
+    checklistCategoriesRequestIds.set(tripId, requestId);
+    const ownerAtStart = cacheUserId;
+
+    const { data, error } = await supabase
+      .from("checklist_categories")
+      .select("*")
+      .eq("trip_id", tripId)
+      .order("sort_order", { ascending: true });
+    if (error) throw fail(error, "체크리스트 카테고리 불러오기");
+    if (checklistCategoriesRequestIds.get(tripId) !== requestId || ownerAtStart !== cacheUserId) return getChecklistCategoriesOfTrip(tripId);
+
+    checklistCategoriesCache = [...checklistCategoriesCache.filter((cat) => cat.tripId !== tripId), ...(data ?? []).map(rowToChecklistCategory)];
+    checklistCategoriesLoadedTrips.add(tripId);
+    return getChecklistCategoriesOfTrip(tripId);
+  }
+
+  const isChecklistCategoriesLoaded = (tripId) => checklistCategoriesLoadedTrips.has(tripId);
+
+  function getChecklistCategoriesOfTrip(tripId) {
+    return checklistCategoriesCache.filter((cat) => cat.tripId === tripId);
+  }
+
+  function getChecklistCategories() {
+    return checklistCategoriesCache;
+  }
+
+  // 카테고리를 하나 추가한다("+" 버튼). sortOrder는 그 여행의 캐시 기준 마지막 순번 + 1 - 항상 맨 끝에 붙는다.
+  async function addChecklistCategory({ tripId, label }) {
+    if (!tripId) throw new Error("카테고리를 넣을 여행을 찾을 수 없어요.");
+    requireUserId();
+    const siblings = checklistCategoriesCache.filter((cat) => cat.tripId === tripId);
+    const nextOrder = siblings.length ? Math.max(...siblings.map((cat) => cat.sortOrder)) + 1 : 0;
+    const { data, error } = await supabase
+      .from("checklist_categories")
+      .insert({ trip_id: tripId, label, sort_order: nextOrder })
+      .select()
+      .single();
+    if (error) throw fail(error, "체크리스트 카테고리 추가");
+
+    const category = rowToChecklistCategory(data);
+    checklistCategoriesCache.push(category);
+    return category;
+  }
+
+  // 카테고리를 지운다(스와이프 삭제, 확인창을 거친 뒤 호출됨) - 서버에서 그 안의 항목도 on delete cascade로
+  // 함께 지워지므로, 캐시에서도 그 category_id를 가진 항목을 같이 걷어낸다.
+  async function deleteChecklistCategory(id) {
+    const { data, error } = await supabase.from("checklist_categories").delete().eq("id", id).select("id");
+    if (error) throw fail(error, "체크리스트 카테고리 삭제");
+    checklistCategoriesCache = checklistCategoriesCache.filter((cat) => cat.id !== id);
+    checklistCache = checklistCache.filter((item) => item.categoryId !== id);
+    return Boolean(data && data.length);
+  }
+
+  function rowToChecklistItem(row) {
+    return {
+      id: row.id,
+      tripId: row.trip_id,
+      categoryId: row.category_id,
+      title: row.title,
+      checked: Boolean(row.checked),
+      sortOrder: typeof row.sort_order === "number" ? row.sort_order : 0, // 같은 trip_id + category_id 안에서만 의미 있는 순서
+      createdBy: row.created_by ?? null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+    };
+  }
+
+  // 한 여행의 체크리스트 항목을 서버에서 다시 받아 캐시에 넣는다 (그 여행의 예전 캐시는 바꿔치기). loadExpenses와 같은 방식.
+  async function loadChecklistItems(tripId) {
+    if (!tripId) return [];
+    const requestId = (checklistRequestIds.get(tripId) ?? 0) + 1;
+    checklistRequestIds.set(tripId, requestId);
+    const ownerAtStart = cacheUserId;
+
+    const { data, error } = await supabase
+      .from("checklist_items")
+      .select("*")
+      .eq("trip_id", tripId)
+      .order("sort_order", { ascending: true });
+    if (error) throw fail(error, "체크리스트 불러오기");
+    if (checklistRequestIds.get(tripId) !== requestId || ownerAtStart !== cacheUserId) return getChecklistItemsOfTrip(tripId);
+
+    checklistCache = [...checklistCache.filter((item) => item.tripId !== tripId), ...(data ?? []).map(rowToChecklistItem)];
+    checklistLoadedTrips.add(tripId);
+    return getChecklistItemsOfTrip(tripId);
+  }
+
+  const isChecklistLoaded = (tripId) => checklistLoadedTrips.has(tripId);
+
+  function getChecklistItemsOfTrip(tripId) {
+    return checklistCache.filter((item) => item.tripId === tripId);
+  }
+
+  // 캐시에 있는 모든 체크리스트 항목 (여행별로 걸러 쓰려면 item.tripId를 본다, getExpenses와 같은 방식)
+  function getChecklistItems() {
+    return checklistCache;
+  }
+
+  // 항목을 하나 추가한다. sortOrder는 호출한 쪽이 넘기지 않으면 그 여행+카테고리의 캐시 기준 마지막 순번 + 1로 정한다
+  // ("+추가하기"로 넣는 새 항목은 항상 그 카테고리의 맨 끝에 붙는다).
+  async function addChecklistItem({ tripId, categoryId, title }) {
+    if (!tripId) throw new Error("항목을 넣을 여행을 찾을 수 없어요.");
+    requireUserId();
+    const siblings = checklistCache.filter((item) => item.tripId === tripId && item.categoryId === categoryId);
+    const nextOrder = siblings.length ? Math.max(...siblings.map((item) => item.sortOrder)) + 1 : 0;
+    const { data, error } = await supabase
+      .from("checklist_items")
+      .insert({ trip_id: tripId, category_id: categoryId, title, sort_order: nextOrder })
+      .select()
+      .single();
+    if (error) throw fail(error, "체크리스트 항목 추가");
+
+    const item = rowToChecklistItem(data);
+    checklistCache.push(item);
+    return item;
+  }
+
+  // patch에 들어 있는 필드만 고친다 (checked 토글, title 수정, sortOrder 순서 변경 모두 이걸로 한다).
+  async function updateChecklistItem(id, patch) {
+    const columns = {};
+    if ("checked" in patch) columns.checked = Boolean(patch.checked);
+    if ("title" in patch) columns.title = patch.title;
+    if ("sortOrder" in patch) columns.sort_order = patch.sortOrder;
+
+    const { data, error } = await supabase.from("checklist_items").update(columns).eq("id", id).select();
+    if (error) throw fail(error, "체크리스트 항목 수정");
+    if (!data || data.length === 0) throw new Error("항목을 수정하지 못했어요. 이미 지워졌거나 수정할 권한이 없어요.");
+
+    const updated = rowToChecklistItem(data[0]);
+    checklistCache = checklistCache.map((item) => (item.id === id ? updated : item));
+    return updated;
+  }
+
+  // 지웠으면 true. 서버에서 이미 없거나 지울 권한이 없어서 지워진 행이 없으면 false. deleteExpense와 같은 모양.
+  async function deleteChecklistItem(id) {
+    const { data, error } = await supabase.from("checklist_items").delete().eq("id", id).select("id");
+    if (error) throw fail(error, "체크리스트 항목 삭제");
+    checklistCache = checklistCache.filter((item) => item.id !== id);
+    return Boolean(data && data.length);
+  }
+
+  // 드래그로 정한 새 순서(한 카테고리 안의 항목 id들, 화면에 보이는 새 순서 그대로)를 서버에 저장한다.
+  // reorderItems(schedule_items)와 같은 방식 - 보이는 순서대로 0, 1, 2...를 다시 매겨서 하나씩 저장한다.
+  async function reorderChecklistItems(orderedIds) {
+    await Promise.all(orderedIds.map((id, index) => updateChecklistItem(id, { sortOrder: index })));
+  }
+
+  // 이 여행에 기본 카테고리·항목(checklistCategoryData.DEFAULT_CHECKLIST_CATEGORIES)을 아직 한 번도 깔지
+  // 않았으면 깔고 true를, 이미 깔았으면(마커가 있으면) 아무것도 하지 않고 false를 돌려준다.
+  // checklist_seeds(trip_id가 기본키)에 먼저 마커를 꽂아서 "내가 지금 심는다"를 선점한다 - 다른 기기/동행자가
+  // 거의 동시에 체크리스트를 열어도 기본키 충돌(23505)로 둘 중 하나만 실제로 심는다. 마커를 꽂은 뒤에 카테고리/항목
+  // 추가가 실패해도(예: 테이블은 있지만 다른 이유로 insert가 막힌 경우) 마커는 남아 있어 다음에 또 시도하지
+  // 않는다 - loadChecklistItems가 던지는 토스트로 원인을 알려주는 게 조용히 매번 재시도하는 것보다 낫다.
+  async function ensureChecklistSeeded(tripId) {
+    if (!tripId) return false;
+    const { data: existing, error: checkError } = await supabase
+      .from("checklist_seeds")
+      .select("trip_id")
+      .eq("trip_id", tripId)
+      .maybeSingle();
+    if (checkError) throw fail(checkError, "체크리스트 초기화 확인");
+    if (existing) return false;
+
+    const { error: markError } = await supabase.from("checklist_seeds").insert({ trip_id: tripId });
+    if (markError) {
+      if (markError.code === "23505") return false; // 다른 곳이 거의 동시에 이미 심었다
+      throw fail(markError, "체크리스트 초기화");
+    }
+
+    const { DEFAULT_CHECKLIST_CATEGORIES } = window.TripLog.checklistCategoryData;
+    const { data: catRows, error: catError } = await supabase
+      .from("checklist_categories")
+      .insert(DEFAULT_CHECKLIST_CATEGORIES.map((cat, index) => ({ trip_id: tripId, label: cat.label, sort_order: index })))
+      .select();
+    if (catError) throw fail(catError, "체크리스트 기본 카테고리 추가");
+
+    const categories = (catRows ?? []).map(rowToChecklistCategory);
+    checklistCategoriesCache = [...checklistCategoriesCache, ...categories];
+
+    // insert가 여러 행 순서를 보장하지 않을 수 있어 index가 아니라 label로 되찾는다 (기본 카테고리는 라벨이 서로 다르다).
+    const categoryIdByLabel = new Map(categories.map((cat) => [cat.label, cat.id]));
+    const itemRows = DEFAULT_CHECKLIST_CATEGORIES.flatMap((cat) =>
+      cat.defaultItems.map((title, index) => ({ trip_id: tripId, category_id: categoryIdByLabel.get(cat.label), title, sort_order: index }))
+    );
+    const { data, error } = await supabase.from("checklist_items").insert(itemRows).select();
+    if (error) throw fail(error, "체크리스트 기본 항목 추가");
+
+    checklistCache = [...checklistCache, ...(data ?? []).map(rowToChecklistItem)];
+    return true;
   }
 
   // ---- ScheduleItem ----
@@ -831,8 +1056,19 @@
   }
 
   // 로그인한 사용자의 user_consents 행이 있는지 서버에서 다시 확인해 캐시한다. 로그인하지 않았으면 캐시를 비운다.
-  // 실패(마이그레이션 미실행, 네트워크 오류 등)해도 던지지 않는다 - 호출한 쪽(app.js)이 await만 하면 되고,
-  // 실패 시 consentLoaded가 false로 남아 hasConsent()가 "막지 않음(true)"을 돌려준다.
+  //
+  // 2026-10-19 보안 점검(RLS-06) 전에는 한 번이라도 실패(네트워크 오류 등)하면 consentLoaded가 계속
+  // false로 남아 hasConsent()가 "막지 않음(true)"을 돌려줬다 - 동의하지 않은 사용자가 일시적 오류 동안
+  // 계속 앱을 쓸 수 있었다는 뜻이다. 이제는 짧은 간격으로 몇 번 더 시도(CONSENT_RETRY_DELAYS_MS)하고,
+  // 그래도 실패하면(마이그레이션을 아직 안 돌린 서버 포함) consentCache를 null로, consentLoaded는 true로
+  // 둬서 hasConsent()가 false(동의 화면 필요)를 돌려주게 한다 - "모르면 일단 막는다"로 기본값을 뒤집었다.
+  // 던지지는 않는다(호출한 쪽은 여전히 await만 하면 된다) - 실패도 하나의 결과일 뿐이라서다.
+  const CONSENT_RETRY_DELAYS_MS = [400, 1200]; // 조정 지점: 최초 1회 + 재시도 2회 = 최대 3회 시도
+
+  function sleep(ms) {
+    return new Promise((resolve) => setTimeout(resolve, ms));
+  }
+
   async function refreshConsent() {
     const userId = auth?.getUserId() ?? null;
     if (!userId) {
@@ -841,20 +1077,32 @@
       return null;
     }
     const requestId = ++consentRequestId;
-    const { data, error } = await supabase.from("user_consents").select("*").eq("user_id", userId).maybeSingle();
-    if (requestId !== consentRequestId) return consentCache; // 더 새로운 요청이나 로그아웃이 있었다
-    if (error) {
-      console.warn("[storage] 약관 동의 여부 확인 실패", error);
-      return consentCache;
+
+    for (let attempt = 0; ; attempt++) {
+      const { data, error } = await supabase.from("user_consents").select("*").eq("user_id", userId).maybeSingle();
+      if (requestId !== consentRequestId) return consentCache; // 더 새로운 요청이나 로그아웃이 있었다
+      if (!error) {
+        consentCache = data ? rowToConsent(data) : null;
+        consentLoaded = true;
+        return consentCache;
+      }
+      if (attempt >= CONSENT_RETRY_DELAYS_MS.length) {
+        console.warn("[storage] 약관 동의 여부 확인 실패(재시도 소진) - 동의 화면으로 보냅니다", error);
+        consentCache = null;
+        consentLoaded = true; // fail-closed
+        return consentCache;
+      }
+      await sleep(CONSENT_RETRY_DELAYS_MS[attempt]);
+      if (requestId !== consentRequestId) return consentCache; // 대기하는 동안 더 새로운 요청/로그아웃이 있었다
     }
-    consentCache = data ? rowToConsent(data) : null;
-    consentLoaded = true;
-    return consentCache;
   }
 
-  // true면 "동의 화면을 안 보여줘도 된다" - consentLoaded가 아직 false(서버 확인 전/실패)면 일단 막지 않고
-  // true를 돌려준다. consentLoaded가 true인데 consentCache가 null이면 서버가 "그 사용자 행이 없다"고 확인해 준
-  // 경우라서, 그때만 실제로 false(동의 화면 필요)를 돌려준다.
+  // true면 "동의 화면을 안 보여줘도 된다" - consentLoaded가 아직 false(이번 로그인에서 refreshConsent가
+  // 아직 한 번도 끝나지 않음 - 재시도 진행 중이거나 호출 자체가 아직 안 끝남)면 일단 막지 않고 true를
+  // 돌려준다(app.js#enterApp이 이 함수를 반드시 기다린 뒤에만 라우팅하므로, 실제 화면 가드에서 이 경로를
+  // 타는 건 "아직 한 번도 로그인한 적 없는 탭"뿐이다). consentLoaded가 true면 재시도까지 전부 끝난
+  // 상태이고, consentCache가 null이면(서버가 "행이 없다"고 확인해 줬거나, 재시도를 다 썼는데도 실패했거나)
+  // 그때는 실제로 false(동의 화면 필요)를 돌려준다.
   function hasConsent() {
     if (!consentLoaded) return true;
     return consentCache !== null;
@@ -967,6 +1215,19 @@
     addExpense,
     updateExpense,
     deleteExpense,
+    loadChecklistCategories,
+    isChecklistCategoriesLoaded,
+    getChecklistCategories,
+    addChecklistCategory,
+    deleteChecklistCategory,
+    loadChecklistItems,
+    isChecklistLoaded,
+    getChecklistItems,
+    addChecklistItem,
+    updateChecklistItem,
+    deleteChecklistItem,
+    reorderChecklistItems,
+    ensureChecklistSeeded,
     loadItems,
     isItemsLoaded,
     getItems,

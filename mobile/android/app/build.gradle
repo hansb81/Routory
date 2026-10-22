@@ -18,7 +18,13 @@ android {
     }
     buildTypes {
         release {
-            minifyEnabled false
+            // 2026-10-19 보안 점검 DEP-02: 전엔 false라 릴리스 APK가 축소·난독화 없이 그대로 나갔다.
+            // Capacitor 플러그인은 각자의 consumer-rules.pro(AAR 안에 번들)로 자기 자신을 지키므로
+            // 보통은 추가 설정 없이 켜도 되지만, 실제 빌드+설치 테스트로 꼭 확인할 것(이 환경엔 Android
+            // SDK/Gradle이 없어 빌드까지는 해 보지 못했다) — proguard-rules.pro에 보수적으로 Capacitor
+            // 브리지 keep 규칙을 추가해 뒀다.
+            minifyEnabled true
+            shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
         }
     }

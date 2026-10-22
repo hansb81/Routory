@@ -1,27 +1,30 @@
 // @별칭 SHELL · 여행 공통 셸 (상단 아이콘 바 · 하단 탭바 · 우측 메뉴)
 // (전체 지도는 D:/VibeCoding/Study_01/comments.html)
-// 나의 여행(#/my-trip/:id) · 일정(#/schedule/:id) · 가계부(#/budget/:id) · 여행지갑(#/wallet/:id) ·
-// 숙소 추가(#/lodging/:id) 다섯 화면에서 화면이 바뀌어도 같은 DOM 하나가 그대로 남아 있는 공통 셸이다.
+// 나의 여행(#/my-trip/:id) · 일정(#/schedule/:id) · 가계부(#/budget/:id) · 체크리스트(#/checklist/:id) ·
+// 여행지갑(#/wallet/:id) · 숙소 추가(#/lodging/:id) 여섯 화면에서 화면이 바뀌어도 같은 DOM 하나가 그대로
+// 남아 있는 공통 셸이다.
 // body에 한 번만 붙이고(모달과 같은 방식), 라우터가 화면을 바꿀 때마다 보이기/숨기기와 하단 탭 강조만 갱신한다.
 //
 //   MYTRIP-TOPBAR    홈(메인으로) · 계정 아이콘·이름(topbarAccountHtml, main의 MAIN-ACCOUNT와 같은 구조) ·
 //                    메뉴(☰) - 검색·지도 아이콘은 아직 뒤에 화면이 없어 통째로 뺐다.
-//   MYTRIP-BOTTOMTABS 일정 · 여행중 · 여행지갑 · 가계부 (각 탭이 자기 라우트일 때만 강조된다. 일정은 예외로
-//                    schedule과 lodging 둘 다에서 강조된다 - 숙소는 일정 화면의 QUICK-MENU에서 들어오는
-//                    화면이라서, budget/wallet과 달리 자기 탭이 따로 없다).
+//   MYTRIP-BOTTOMTABS 일정 · 여행중 · 여행지갑 · 가계부 · 체크리스트 (각 탭이 자기 라우트일 때만 강조된다.
+//                    일정은 예외로 schedule과 lodging 둘 다에서 강조된다 - 숙소는 일정 화면의 QUICK-MENU에서
+//                    들어오는 화면이라서, budget/wallet/checklist와 달리 자기 탭이 따로 없다).
 //                    여행지갑/가계부는 원래 일정 화면의 QUICK-MENU 버튼이었는데 여기 하단 탭으로 옮겨왔다
 //                    (그 두 화면의 QUICK-MENU 진입 흔적인 ← 뒤로가기 버튼도 같이 없앴다 - budgetPage.js/
 //                    walletPage.js 참고). 숙소는 한 번 같이 하단 탭으로 옮겼다가 다시 QUICK-MENU로
 //                    돌아왔다(schedule.js/lodging.js 참고, lodging.js는 그래서 ← 버튼이 그대로 있다).
 //                    예전에 있던 저장/여행도구(둘 다 "준비 중" 토스트만 뜨던 더미 탭)는 통째로 지웠다.
+//                    체크리스트는 가계부 옆에 새로 추가한 다섯 번째 탭이다 (checklistPage.js 참고).
 //   MYTRIP-MENU      우측 슬라이드 메뉴: 패널 헤드 왼쪽 끝에 닫기(✕), 오른쪽 끝에 알림(🔔)·설정(⚙,
 //                    commonPages.js 공용 화면) 두 아이콘을 바짝 붙여 묶는다(.mytrip-panel-head-actions).
 //                    그 아래 프로필 줄(menuProfileHtml, main의 MAIN-MENU 프로필 줄과 같은 CSS) ·
 //                    여행 공유(owner, invite.js)·여행 가져오기(tripImport.js)·동행자 관리(tripMembers.js) +
-//                    여행 삭제(owner)/나가기(참여자). 로그아웃·알림 설정·여행 설정은 다른 위치로 옮길
+//                    여행 삭제(owner)/나가기(참여자). 맨 아래엔 main의 MAIN-MENU와 같은 형식(.main-menu-links)
+//                    으로 공지사항·문의하기 바로가기를 둔다. 로그아웃·알림 설정·여행 설정은 다른 위치로 옮길
 //                    예정이라 일단 뺐다(메뉴 텍스트 "메뉴" 자체도 뺐다).
 //
-// 네 화면 모두 지금 보는 여행은 storage.getTrip()으로 얻는다 (각 화면의 requireTrip 가드가 미리 정해 둔다).
+// 다섯 화면 모두 지금 보는 여행은 storage.getTrip()으로 얻는다 (각 화면의 requireTrip 가드가 미리 정해 둔다).
 
 (function () {
   const { getTrip, loadItems, getItems, deleteTrip, leaveTrip } = window.TripLog.storage;
@@ -34,7 +37,7 @@
   const tripImport = window.TripLog.tripImport;
   const tripMembers = window.TripLog.tripMembers;
 
-  const SHELL_ROUTES = ["my-trip", "schedule", "budget", "wallet", "lodging"]; // 이 화면들에서만 셸이 보인다
+  const SHELL_ROUTES = ["my-trip", "schedule", "budget", "checklist", "wallet", "lodging"]; // 이 화면들에서만 셸이 보인다
   const ALL_ROUTES = [
     "main",
     "my-trip",
@@ -42,12 +45,14 @@
     "login",
     "invite",
     "budget",
+    "checklist",
     "wallet",
     "lodging",
     "notifications",
     "settings",
     "terms",
     "privacy",
+    "ai-usage",
     "consent",
     "account-delete",
     "notice",
@@ -69,6 +74,7 @@
     trip: icon('<path d="M12 21s-6.5-5.6-6.5-10.5a6.5 6.5 0 0113 0C18.5 15.4 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.3"/>'),
     wallet: icon('<rect x="3" y="6" width="18" height="13" rx="2.5"/><path d="M3 10.5h18"/><circle cx="16.5" cy="14.5" r="1.1" fill="currentColor" stroke="none"/>'),
     budget: icon('<path d="M6.5 3.5h11v17l-2.75-1.8-2.75 1.8-2.75-1.8-2.75 1.8v-17z"/><path d="M9 8h6M9 11.5h6M9 15h3.5"/>'),
+    checklist: icon('<rect x="5" y="4" width="14" height="17" rx="2"/><path d="M9 9.5l1.3 1.3L12.5 8.5M9 15l1.3 1.3L12.5 14"/><path d="M14.5 9.5h3M14.5 15h3"/>'),
   };
 
   // 일정을 여행중보다 앞에 둔다 (일정이 기본 진입 화면이라서): 여기 순서가 그대로 하단 탭 순서다.
@@ -81,6 +87,7 @@
     { id: "ongoing", label: "여행중", icon: ICONS.trip, route: "my-trip", activeOn: ["my-trip"] },
     { id: "wallet", label: "여행지갑", icon: ICONS.wallet, route: "wallet", activeOn: ["wallet"] },
     { id: "budget", label: "가계부", icon: ICONS.budget, route: "budget", activeOn: ["budget"] },
+    { id: "checklist", label: "체크리스트", icon: ICONS.checklist, route: "checklist", activeOn: ["checklist"] },
   ];
 
   let shellEl = null;
@@ -145,6 +152,10 @@
           </div>
           ${menuProfileHtml()}
           <ul class="mytrip-menu" data-menu-list></ul>
+          <div class="main-menu-links">
+            <button type="button" data-action="notice">공지사항</button>
+            <button type="button" data-action="contact">문의하기</button>
+          </div>
         </aside>
       </div>`;
     document.body.appendChild(shellEl);
@@ -356,6 +367,12 @@
     } else if (action === "settings") {
       setDrawer(false);
       router.navigate(router.buildPath("settings"));
+    } else if (action === "notice") {
+      setDrawer(false);
+      router.navigate(router.buildPath("notice"));
+    } else if (action === "contact") {
+      setDrawer(false);
+      router.navigate(router.buildPath("contact"));
     } else if ((action === "delete-trip" || action === "leave-trip") && trip) {
       setDrawer(false);
       openExitModal(trip, action === "delete-trip" ? "delete" : "leave");

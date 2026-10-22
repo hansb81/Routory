@@ -82,34 +82,65 @@ const RESPONSE_SCHEMA = {
   required: ["tickets"],
 };
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+// 허용 출처(2026-10-19 보안 점검 EDGE-07) - 예전엔 Access-Control-Allow-Origin이 "*"라 어떤 사이트에서도
+// (탈취된 세션 토큰을 들고) 이 함수를 브라우저에서 직접 호출할 수 있었다. 요청의 Origin이 이 목록에
+// 있을 때만 그 값을 그대로 돌려주고, 없으면 배포 사이트 값을 돌려줘서(요청 출처와 안 맞으니 브라우저가
+// 응답을 읽지 못한다) 사실상 막는다 - 로컬 개발 서버·네이티브 앱(Capacitor WebView 기본 출처)·배포
+// 사이트 셋 다 계속 동작해야 해서 단일 고정값 대신 매 요청마다 Origin을 확인한다.
+const ALLOWED_ORIGINS = new Set([
+  "http://localhost:8080", // serve.py 로컬 개발
+  "https://triplog-nu.vercel.app", // 배포된 사이트 - 도메인이 바뀌면 여기도 같이 바꿔야 한다
+  "https://localhost", // Capacitor Android WebView 기본 출처(capacitor.config.json에 androidScheme 오버라이드 없음)
+]);
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS_HEADERS, "Content-Type": "application/json; charset=utf-8" },
-  });
+function corsHeadersFor(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin") ?? req.headers.get("Origin");
+  return {
+    "Access-Control-Allow-Origin": origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://triplog-nu.vercel.app",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
 }
 
-const fail = () => json({ error: FAIL_MESSAGE });
-
 // ---- 로그인 확인 ----
-// Supabase가 서명을 이미 확인한 토큰(verify_jwt)이라 payload의 role만 본다.
+// Supabase가 서명을 이미 확인한 토큰(verify_jwt)이라 payload의 role/sub만 본다.
 // 앱에 공개돼 있는 anon 키만으로는 호출할 수 없게 해서, 누구나 Gemini 사용량을 쓰지 못하게 한다.
-function isSignedIn(req: Request): boolean {
+function authClaims(req: Request): { authenticated: boolean; userId: string | null } {
   try {
     const token = (req.headers.get("Authorization") ?? "").replace(/^Bearer\s+/i, "");
     const payload = token.split(".")[1];
-    if (!payload) return false;
+    if (!payload) return { authenticated: false, userId: null };
     const padded = payload.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(payload.length / 4) * 4, "=");
-    return JSON.parse(atob(padded)).role === "authenticated";
+    const claims = JSON.parse(atob(padded));
+    return { authenticated: claims.role === "authenticated", userId: typeof claims.sub === "string" ? claims.sub : null };
   } catch {
-    return false;
+    return { authenticated: false, userId: null };
   }
+}
+
+// ---- 남용 방지: 사용자당 분당 호출 상한 (search-destination#checkRateLimit과 같은 방식) ----
+// 로그인 확인만으로는 한 계정이 Gemini 호출(유료 API)을 무제한 반복하는 것을 막지 못한다 - 함수 인스턴스
+// 메모리에만 두는 best-effort 제한이다(콜드 스타트·다중 인스턴스에서는 실제 상한이 설정값보다 높아질 수
+// 있다 - 엄격한 보장이 필요해지면 Postgres 테이블 기반 리미터로 바꿔야 한다).
+const RATE_LIMIT_PER_MINUTE = 10; // 조정 지점
+const RATE_LIMIT_WINDOW_MS = 60_000;
+const rateLimitMap = new Map<string, { windowStart: number; count: number }>();
+
+function checkRateLimit(userId: string): boolean {
+  const now = Date.now();
+  if (Math.random() < 0.01) {
+    for (const [key, entry] of rateLimitMap) {
+      if (now - entry.windowStart > RATE_LIMIT_WINDOW_MS * 2) rateLimitMap.delete(key);
+    }
+  }
+  const entry = rateLimitMap.get(userId);
+  if (!entry || now - entry.windowStart >= RATE_LIMIT_WINDOW_MS) {
+    rateLimitMap.set(userId, { windowStart: now, count: 1 });
+    return true;
+  }
+  entry.count += 1;
+  return entry.count <= RATE_LIMIT_PER_MINUTE;
 }
 
 // ---- 이미지 ----
@@ -282,9 +313,20 @@ function dedupeTickets(tickets: ReturnType<typeof toTicket>[]): ReturnType<typeo
 // ---- 요청 처리 ----
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  const CORS_HEADERS = corsHeadersFor(req);
+  function json(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json; charset=utf-8" },
+    });
+  }
+  const fail = () => json({ error: FAIL_MESSAGE });
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
   if (req.method !== "POST") return json({ error: "POST 요청만 받아요" }, 405);
-  if (!isSignedIn(req)) return json({ error: "로그인이 필요해요" }, 401);
+  const { authenticated, userId } = authClaims(req);
+  if (!authenticated || !userId) return json({ error: "로그인이 필요해요" }, 401);
+  if (!checkRateLimit(userId)) return json({ error: "너무 자주 호출했어요. 잠시 뒤 다시 시도해주세요" }, 429);
 
   const body = await req.json().catch(() => null);
   const image = readImage(body);

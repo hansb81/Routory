@@ -30,11 +30,24 @@
 // 충분, 시간당 호출 한도가 낮을 뿐)
 // SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY는 Supabase가 자동으로 넣어준다.
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+// 허용 출처(2026-10-19 보안 점검 EDGE-07) - analyze-ticket과 동일한 이유/방식.
+const ALLOWED_ORIGINS = new Set([
+  "http://localhost:8080",
+  "https://triplog-nu.vercel.app",
+  "https://localhost",
+]);
+
+function corsHeadersFor(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin") ?? req.headers.get("Origin");
+  return {
+    "Access-Control-Allow-Origin": origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://triplog-nu.vercel.app",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
+}
+
+type JsonFn = (body: unknown, status?: number) => Response;
 
 const UNSPLASH_SEARCH_URL = "https://api.unsplash.com/search/photos";
 const UNSPLASH_API_HOST = "https://api.unsplash.com/";
@@ -44,13 +57,6 @@ const MAX_QUERY_CHARS = 100;
 // Routory가 Unsplash 사진을 쓰고 있다는 걸 Unsplash 쪽 통계/귀속 표시에 식별시키는 값 (요청된 utm 포맷,
 // 앱 이름 변경 시 여기만 바꾸면 된다 - CLAUDE.md "표시명 Routory" 참고)
 const UTM_PARAMS = "utm_source=routory&utm_medium=referral";
-
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS_HEADERS, "Content-Type": "application/json; charset=utf-8" },
-  });
-}
 
 // ---- 로그인 확인 (search-pexels#authClaims와 같은 패턴) ----
 
@@ -121,7 +127,7 @@ function normalize(photo: UnsplashPhoto) {
   };
 }
 
-async function handleSearch(unsplashKey: string, query: string): Promise<Response> {
+async function handleSearch(unsplashKey: string, query: string, json: JsonFn): Promise<Response> {
   try {
     const controller = new AbortController();
     const timer = setTimeout(() => controller.abort(), FETCH_TIMEOUT_MS);
@@ -142,7 +148,7 @@ async function handleSearch(unsplashKey: string, query: string): Promise<Respons
   }
 }
 
-async function handleTrackDownload(unsplashKey: string, downloadLocation: string): Promise<Response> {
+async function handleTrackDownload(unsplashKey: string, downloadLocation: string, json: JsonFn): Promise<Response> {
   if (!isUnsplashDownloadLocation(downloadLocation)) {
     return json({ error: "잘못된 downloadLocation이에요" }, 400);
   }
@@ -164,6 +170,13 @@ async function handleTrackDownload(unsplashKey: string, downloadLocation: string
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  const CORS_HEADERS = corsHeadersFor(req);
+  const json: JsonFn = (body, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json; charset=utf-8" },
+    });
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
   if (req.method !== "POST") return json({ error: "POST 요청만 받아요" }, 405);
 
@@ -189,9 +202,9 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const body = await req.json().catch(() => null);
 
   const downloadLocation = typeof body?.downloadLocation === "string" ? body.downloadLocation : null;
-  if (downloadLocation) return handleTrackDownload(unsplashKey, downloadLocation);
+  if (downloadLocation) return handleTrackDownload(unsplashKey, downloadLocation, json);
 
   const query = typeof body?.query === "string" ? body.query.trim().slice(0, MAX_QUERY_CHARS) : "";
   if (!query) return json({ error: "query가 비어있어요" }, 400);
-  return handleSearch(unsplashKey, query);
+  return handleSearch(unsplashKey, query, json);
 });

@@ -13,6 +13,19 @@
       .replace(/"/g, "&quot;");
   }
 
+  // href/src에 그대로 쓸 URL인지 확인한다 - escapeHtml()은 &<>"만 이스케이프할 뿐 javascript:/data:
+  // 같은 스킴은 걸러내지 않는다. http(s)가 아니면 빈 문자열을 돌려주니, 호출한 쪽은 그 결과가 비어
+  // 있으면 링크 자체를 안 그리거나(href 생략) 평문으로 대체해야 한다(escapeHtml(label)만 쓰는 식).
+  function safeHttpUrl(value) {
+    if (typeof value !== "string" || !value) return "";
+    try {
+      const url = new URL(value);
+      return url.protocol === "http:" || url.protocol === "https:" ? value : "";
+    } catch {
+      return "";
+    }
+  }
+
   function generateId() {
     if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
       return crypto.randomUUID();
@@ -94,6 +107,7 @@
   window.TripLog.util = {
     WEEKDAYS,
     escapeHtml,
+    safeHttpUrl,
     generateId,
     pad,
     toDateKey,

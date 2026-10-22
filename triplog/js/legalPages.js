@@ -1,11 +1,13 @@
-// @별칭 LEGAL-PAGE · 이용약관 · 개인정보처리방침 (#/terms, #/privacy)
+// @별칭 LEGAL-PAGE · 이용약관 · 개인정보처리방침 · AI/API 이용 안내 (#/terms, #/privacy, #/ai-usage)
 // (전체 지도는 D:/VibeCoding/Study_01/comments.html)
 //
 // ⚠️ 법률 자문이 아닙니다 (NOT LEGAL ADVICE) ⚠️
 // 아래 TERMS_SECTIONS/PRIVACY_SECTIONS의 모든 문구는 변호사의 법률 검토를 거치지 않은 초안(draft)이다.
-// Routory가 실제로 다루는 데이터 흐름(storage.js/walletForm.js 등, CLAUDE.md 참고)을 반영해서 썼지만,
-// 실제 서비스 공개 전에는 반드시 법률 전문가(개인정보보호법·전자상거래법 등)의 검토를 받아야 한다.
-// 시행일·회사 정보·개인정보 보호책임자 연락처 등도 전부 placeholder다 - 실제 값으로 채워 넣어야 한다.
+// Routory가 실제로 다루는 데이터 흐름(storage.js/walletForm.js 등, CLAUDE.md 참고)을 반영해서 썼고,
+// 2026-10-18 플레이스토어 등록 준비 과정에서 시행일(EFFECTIVE_DATE)·개인정보 보호책임자 연락처를 실제
+// 값으로 채워 사용자 화면에는 더 이상 "초안"/"미구현" 문구가 보이지 않지만, 변호사의 법률 검토를 거친
+// 문서는 아니다 - 실제 서비스 공개 전에는 반드시 법률 전문가(개인정보보호법·전자상거래법 등)의 검토를
+// 받는 것을 권장한다.
 //
 // 로그인 가드가 없는 화면이다(router.js에 requireLogin을 걸지 않았다) - 가입 전에도 약관을 읽을 수 있어야
 // 하기 때문이다. commonPages.js의 "설정" 화면(#/settings)과 consentPage.js의 동의 화면(#/consent) 양쪽에서
@@ -21,8 +23,9 @@
   const router = window.TripLog.router;
   const { escapeHtml } = window.TripLog.util;
 
-  const TERMS_VERSION = "1.0";
-  const PRIVACY_VERSION = "1.1"; // 푸시 알림 토큰 수집·FCM(Google) 처리위탁 항목 추가 - 내용이 바뀌면 재동의를 받아야 해서 버전을 올린다
+  const TERMS_VERSION = "1.1"; // 2026-10-18: 회원 탈퇴 기능 반영(제8조 "미구현" 문구 제거), 시행일 확정
+  const PRIVACY_VERSION = "1.2"; // 2026-10-18: 회원 탈퇴/권리 행사 경로 반영, Resend(1:1 문의 메일) 처리위탁 추가, 시행일 확정 - 내용이 바뀌면 재동의를 받아야 해서 버전을 올린다
+  const EFFECTIVE_DATE = "2026년 10월 18일";
 
   const icon = (paths) =>
     `<svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths}</svg>`;
@@ -87,7 +90,7 @@
     {
       h: "제8조 (계약 해지 및 이용 제한)",
       p: [
-        "회원은 언제든지 서비스 내 설정을 통해 회원 탈퇴를 요청할 수 있으며, 탈퇴 시 관련 법령 및 개인정보처리방침에 따라 데이터가 처리됩니다. (초안: 탈퇴 기능 자체는 아직 구현되지 않았습니다)",
+        "회원은 언제든지 설정 > 계정 > 회원 탈퇴를 통해 탈퇴를 요청할 수 있으며, 탈퇴 시 관련 법령 및 개인정보처리방침에 따라 데이터가 처리됩니다. 로그인할 수 없는 경우에는 로그인 없이 삭제를 요청할 수 있는 별도 페이지(/account-deletion)를 이용할 수 있습니다.",
       ],
     },
     {
@@ -96,7 +99,7 @@
     },
     {
       h: "부칙",
-      p: ["이 약관은 초안이며 아직 시행되지 않았습니다. (시행일: 추후 확정)"],
+      p: [`이 약관은 ${EFFECTIVE_DATE}부터 시행됩니다.`],
     },
   ];
 
@@ -138,7 +141,7 @@
     {
       h: "4. 개인정보의 보유 및 이용 기간",
       p: [
-        "회원 탈퇴 시 관련 법령에서 별도로 보존 의무를 정하지 않는 한 지체 없이 파기합니다. (초안: 회원 탈퇴 기능은 아직 구현되지 않았습니다)",
+        "회원 탈퇴 시 관련 법령에서 별도로 보존 의무를 정하지 않는 한 지체 없이 파기합니다. 탈퇴는 설정 > 계정 > 회원 탈퇴에서 요청할 수 있고, 로그인할 수 없는 경우에는 로그인 없이도 삭제를 요청할 수 있는 별도 페이지(/account-deletion)를 이용할 수 있습니다.",
         "여행을 삭제하면 해당 여행의 일정·가계부·초대 링크·멤버 정보가 함께 삭제됩니다. 여행지갑 파일은 특정 여행과 연결이 끊어질 뿐 개인 문서함에 남습니다(계정 자체를 탈퇴하기 전까지).",
         "푸시 알림 토큰은 회원이 알림을 끄거나, 로그아웃하거나, 회원 탈퇴할 때 그 기기·브라우저의 토큰만 즉시 삭제됩니다.",
       ],
@@ -158,13 +161,16 @@
         "Google Gemini(AI): 항공권 사진·여행 가져오기 문서의 텍스트/일정 분석 — 분석 요청 시에만 일시적으로 전송되며 저장되지 않습니다",
         "Google 지도: 장소 검색, 좌표 변환, 경로·이동시간 조회",
         "Firebase Cloud Messaging(Google): 안드로이드 앱의 푸시 알림 발송 — 알림을 켠 회원의 기기 토큰과 알림 제목·내용만 전달되며, 그 외 개인정보는 전달하지 않습니다",
+        "Resend: 1:1 문의하기 메일 발송 — 문의 제목·내용과 답장을 받을 이메일 주소만 전달됩니다",
+        "AviationStack: 회원이 설정에서 직접 등록한 개인 API 키로 항공편 출발·도착 정보를 조회하는 기능 — 편명 등 조회에 필요한 값만 전송되며, 이 키는 회사 서버가 아니라 이용 중인 기기의 브라우저 저장소에만 보관됩니다",
         "외부 공공데이터·환율·날씨 API(open.er-api.com, Open-Meteo, 공항 혼잡도 등): 참고 정보 조회용이며 회원의 개인정보를 전달하지 않습니다",
+        "사용 중인 AI/외부 API의 전체 목록과 각 서비스의 출처는 설정 > 개인정보 및 약관 > AI 및 외부 서비스 이용 안내에서도 확인할 수 있습니다",
       ],
     },
     {
       h: "7. 정보주체의 권리",
       p: [
-        "회원은 언제든지 자신의 개인정보에 대한 열람, 정정, 삭제, 처리정지를 요청할 수 있습니다. (초안: 설정 화면에서 직접 처리할 수 있는 기능은 아직 구현되지 않았으며, 현재는 별도 문의 채널을 통해서만 가능합니다)",
+        "회원은 언제든지 자신의 개인정보에 대한 열람, 정정, 삭제, 처리정지를 요청할 수 있습니다. 삭제(회원 탈퇴)는 설정 > 계정 > 회원 탈퇴에서 직접 요청할 수 있고, 로그인할 수 없는 경우에는 로그인 없이도 요청할 수 있는 별도 페이지(/account-deletion)를 이용할 수 있습니다. 그 외 열람·정정 등 요청은 설정 > 고객센터 > 1:1 문의하기를 통해 접수할 수 있습니다.",
         "마케팅 정보 수신에 동의한 경우, 언제든지 동의를 철회할 수 있습니다.",
       ],
     },
@@ -184,11 +190,11 @@
     },
     {
       h: "10. 개인정보 보호책임자",
-      p: ["(초안: 실제 서비스명·담당자·연락처로 교체 필요) 이메일: privacy@example.com"],
+      p: ["Routory 개인정보 보호책임자 · 이메일: lorddark01@gmail.com"],
     },
     {
       h: "부칙",
-      p: ["이 개인정보처리방침은 초안이며 아직 시행되지 않았습니다. (시행일: 추후 확정)"],
+      p: [`이 개인정보처리방침은 ${EFFECTIVE_DATE}부터 시행됩니다.`],
     },
   ];
 
@@ -198,14 +204,14 @@
     return `<section><h2>${escapeHtml(section.h)}</h2>${paragraphs}${list}</section>`;
   }
 
-  function render(title, sections, version) {
+  function render(title, sections, metaText) {
     return (el) => {
       el.innerHTML = `
         <header class="simple-page-header">
           <button type="button" class="mytrip-icon-btn mytrip-icon-btn--dark" data-action="back" aria-label="뒤로">${BACK_ICON}</button>
           <h1 class="simple-page-title">${escapeHtml(title)}</h1>
         </header>
-        <p class="legal-meta">버전 ${escapeHtml(version)} · 초안(draft) — 아직 시행되지 않았어요.</p>
+        <p class="legal-meta">${escapeHtml(metaText)}</p>
         <div class="legal-content">${sections.map(sectionHtml).join("")}</div>`;
       if (!el.dataset.bound) {
         el.dataset.bound = "1";
@@ -216,8 +222,58 @@
     };
   }
 
-  router.definePage("terms", render("이용약관", TERMS_SECTIONS, TERMS_VERSION));
-  router.definePage("privacy", render("개인정보처리방침", PRIVACY_SECTIONS, PRIVACY_VERSION));
+  // ---- AI 및 외부 서비스 이용 안내 (#/ai-usage) ----
+  // 개인정보처리방침 섹션 6(처리위탁)의 요약을 "무엇을·왜·어디서(출처)" 기준으로 풀어 쓴 목록 페이지.
+  // 약관처럼 동의가 필요한 문서는 아니라서 버전/시행일 개념이 없고, 내용이 바뀌면 아래 LAST_UPDATED만
+  // 갱신한다 - consentPage.js/010_user_consents.sql과는 무관하다.
+  const LAST_UPDATED = "2026년 10월 18일";
+  const AI_API_SECTIONS = [
+    {
+      h: "1. AI 분석 기능",
+      p: [
+        "항공권 사진 인식(촬영한 항공권 사진에서 항공사·편명·출발/도착 공항·시각을 읽어 일정에 자동으로 채워 넣는 기능)과 여행 가져오기(기존 예약 문서에서 일정 초안을 추출하는 기능)는 Google Gemini API를 사용합니다.",
+        "사진/문서는 분석 요청 시에만 Google Gemini API로 전송되며, 회사 서버에는 저장되지 않고 분석이 끝나면 즉시 폐기됩니다. AI 분석 결과는 참고용 초안이며, 회원은 등록 전 내용을 반드시 확인해야 합니다.",
+      ],
+    },
+    {
+      h: "2. 사용 중인 외부 API·서비스",
+      ul: [
+        "Google Gemini API — 항공권/문서 AI 분석(OCR 포함). 출처: https://ai.google.dev/",
+        "Google Maps Platform (Maps JavaScript API, Geocoding API, Places API) — 지도 표시, 주소·좌표 변환, 장소 검색. 출처: https://mapsplatform.google.com/",
+        "Firebase Cloud Messaging(Google) — 안드로이드 앱의 푸시 알림 발송. 출처: https://firebase.google.com/products/cloud-messaging",
+        "웹 푸시(Web Push, W3C 표준) — 브라우저(Chrome/Edge는 Google, Firefox는 Mozilla 등)의 자체 푸시 서비스를 통한 웹 알림 발송",
+        "Supabase — 로그인, 데이터베이스, 파일 저장소, 서버 기능(Edge Functions) 운영. 출처: https://supabase.com/",
+        "구글/카카오/네이버 소셜 로그인 — 회원가입 및 로그인. 각 사의 OAuth 인증 서비스를 사용합니다",
+        "카카오 JS SDK — '카카오톡으로 초대하기' 기능(초대 링크 공유). 출처: https://developers.kakao.com/",
+        "AviationStack — 회원이 설정에서 직접 등록한 개인 API 키로 조회하는 항공편 실시간 출발·도착 정보. 출처: https://aviationstack.com/",
+        "Resend — 1:1 문의하기에서 보낸 문의 메일 발송. 출처: https://resend.com/",
+        "환율/날씨/공항 혼잡도 등 공공·오픈 데이터 API(open.er-api.com, Open-Meteo 등) — 참고용 부가 정보 조회",
+      ],
+    },
+    {
+      h: "3. 사용 중인 오픈소스 라이브러리",
+      ul: [
+        "SheetJS(xlsx) — 여행 내보내기(엑셀 파일 생성) 기능. 출처: https://sheetjs.com/ (Apache License 2.0)",
+      ],
+    },
+    {
+      h: "4. 관리자 전용",
+      p: [
+        "Pexels — 관리자가 '여행 소식·인기 여행지' 카드에 쓸 이미지를 검색하는 용도로만 사용하며, 일반 회원의 개인정보와는 관련이 없습니다. 출처: https://www.pexels.com/",
+      ],
+    },
+    {
+      h: "5. 참고",
+      p: [
+        "각 서비스로 전달되는 개인정보의 범위와 목적은 개인정보처리방침 제6조(개인정보 처리위탁)에서 더 자세히 설명합니다.",
+        "사용하는 서비스는 기능 추가·변경에 따라 달라질 수 있으며, 변경 시 이 목록을 함께 업데이트합니다.",
+      ],
+    },
+  ];
+
+  router.definePage("terms", render("이용약관", TERMS_SECTIONS, `버전 ${TERMS_VERSION} · ${EFFECTIVE_DATE} 시행`));
+  router.definePage("privacy", render("개인정보처리방침", PRIVACY_SECTIONS, `버전 ${PRIVACY_VERSION} · ${EFFECTIVE_DATE} 시행`));
+  router.definePage("ai-usage", render("AI 및 외부 서비스 이용 안내", AI_API_SECTIONS, `최종 업데이트 ${LAST_UPDATED}`));
 
   window.TripLog = window.TripLog || {};
   window.TripLog.legalPages = { TERMS_VERSION, PRIVACY_VERSION };

@@ -1,7 +1,7 @@
 <?xml version='1.0' encoding='utf-8'?>
 <resources>
-    <string name="app_name">TripLog</string>
-    <string name="title_activity_main">TripLog</string>
+    <string name="app_name">Routory</string>
+    <string name="title_activity_main">Routory</string>
     <string name="package_name">com.teamsdb.routory</string>
     <string name="custom_url_scheme">com.teamsdb.routory</string>
 </resources>

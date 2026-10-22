@@ -34,6 +34,16 @@
 //   SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY는 Supabase가 모든 Edge Function에 자동으로 넣어준다.
 
 const CRON_SECRET_HEADER = "x-cron-secret";
+
+// 상수 시간 비교(2026-10-19 보안 점검 EDGE-05, collect-travel-feed#timingSafeEqual과 동일)
+function timingSafeEqual(a: string, b: string): boolean {
+  const ab = new TextEncoder().encode(a);
+  const bb = new TextEncoder().encode(b);
+  if (ab.length !== bb.length) return false;
+  let diff = 0;
+  for (let i = 0; i < ab.length; i++) diff |= ab[i] ^ bb[i];
+  return diff === 0;
+}
 const OPEN_METEO_URL = "https://api.open-meteo.com/v1/forecast";
 const FETCH_TIMEOUT_MS = 10_000;
 const BATCH_SIZE = 50; // 조정 지점: 한 번의 Open-Meteo 호출에 묶을 최대 도시 수 (공식 상한 미확인 - 보수적으로 설정)
@@ -174,7 +184,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method !== "POST") return json({ error: "POST 요청만 받아요" }, 405);
 
   const cronSecret = Deno.env.get("CRON_SECRET");
-  if (!cronSecret || req.headers.get(CRON_SECRET_HEADER) !== cronSecret) {
+  if (!cronSecret || !timingSafeEqual(req.headers.get(CRON_SECRET_HEADER) ?? "", cronSecret)) {
     return json({ error: "unauthorized" }, 401);
   }
 

@@ -63,20 +63,22 @@
 // 고정해 둔다.
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.45.4";
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+// 허용 출처(2026-10-19 보안 점검 EDGE-07) - analyze-ticket과 동일한 이유/방식.
+const ALLOWED_ORIGINS = new Set([
+  "http://localhost:8080",
+  "https://triplog-nu.vercel.app",
+  "https://localhost",
+]);
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS_HEADERS, "Content-Type": "application/json; charset=utf-8" },
-  });
+function corsHeadersFor(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin") ?? req.headers.get("Origin");
+  return {
+    "Access-Control-Allow-Origin": origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://triplog-nu.vercel.app",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
 }
-
-const fail = (status: number, message: string) => json({ error: message }, status);
 
 // ---- 지울 사용자 id (요청을 보낸 사람 본인) ----
 // Supabase가 서명을 이미 확인한 토큰이라(analyze-ticket#isSignedIn과 같은 이유) payload만 읽는다.
@@ -130,6 +132,15 @@ async function deleteWalletItems(admin: SupabaseAdmin, userId: string): Promise<
 }
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  const CORS_HEADERS = corsHeadersFor(req);
+  function json(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json; charset=utf-8" },
+    });
+  }
+  const fail = (status: number, message: string) => json({ error: message }, status);
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
   if (req.method !== "POST") return fail(405, "POST 요청만 받아요");
 
@@ -162,7 +173,10 @@ Deno.serve(async (req: Request): Promise<Response> => {
   } catch (err) {
     const message = err instanceof Error ? err.message : String(err);
     console.error("[delete-account] 탈퇴 처리 실패", userId, message);
-    return fail(500, message);
+    // 2026-10-19 보안 점검 EDGE-06: 예전엔 이 단계별 상세 메시지(내부 테이블/구현 디테일 포함)를 응답
+    // 본문에 그대로 돌려줬다 - 클라이언트가 화면엔 안 보여준다 해도 네트워크 탭에선 그대로 노출됐다.
+    // 다른 모든 함수와 같은 원칙(상세는 로그에만, 응답은 고정 메시지)으로 맞춘다.
+    return fail(500, "탈퇴 처리 중 오류가 발생했어요. 잠시 후 다시 시도해주세요");
   }
 
   return json({});

@@ -46,6 +46,19 @@
 //   - 세 소스 모두 실제 응답을 받아보기 전까지는 pickText()의 후보 필드 이름 목록만 맞으면 그대로 동작한다.
 
 const CRON_SECRET_HEADER = "x-cron-secret";
+
+// 상수 시간 비교(2026-10-19 보안 점검 EDGE-05) - 일반 `!==` 문자열 비교는 첫 번째로 다른 글자에서 바로
+// false가 되므로, 이론상 응답 시간차로 비밀값을 한 글자씩 추정하는 타이밍 공격의 여지가 있다. 길이가
+// 다르면 그 즉시 false이되(더 비교할 이유가 없다), 길이가 같으면 끝까지 모든 바이트를 다 비교해서
+// "몇 번째 글자에서 달랐는지"가 시간차로 드러나지 않게 한다.
+function timingSafeEqual(a: string, b: string): boolean {
+  const ab = new TextEncoder().encode(a);
+  const bb = new TextEncoder().encode(b);
+  if (ab.length !== bb.length) return false;
+  let diff = 0;
+  for (let i = 0; i < ab.length; i++) diff |= ab[i] ^ bb[i];
+  return diff === 0;
+}
 const MAX_RETRIES = 2; // 요청 6번: 실패한 호출은 재시도 횟수를 제한한다
 const RETRY_DELAY_MS = 600;
 const FETCH_TIMEOUT_MS = 10_000;
@@ -360,7 +373,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   if (req.method !== "POST") return json({ error: "POST 요청만 받아요" }, 405);
 
   const cronSecret = Deno.env.get("CRON_SECRET");
-  if (!cronSecret || req.headers.get(CRON_SECRET_HEADER) !== cronSecret) {
+  if (!cronSecret || !timingSafeEqual(req.headers.get(CRON_SECRET_HEADER) ?? "", cronSecret)) {
     return json({ error: "unauthorized" }, 401);
   }
 

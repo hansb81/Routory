@@ -1,7 +1,9 @@
 <?xml version="1.0" encoding="utf-8" ?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- 2026-10-19 보안 점검 DEP-03: allowBackup이 true였을 때는 adb backup/Android 자동 백업으로
+         WebView의 localStorage(Supabase 세션 토큰 포함)·IndexedDB(첨부 사진)가 통째로 추출될 수 있었다. -->
     <application
-        android:allowBackup="true"
+        android:allowBackup="false"
         android:icon="@mipmap/ic_launcher"
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"

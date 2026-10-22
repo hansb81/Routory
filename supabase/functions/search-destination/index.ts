@@ -34,18 +34,24 @@ const MAX_RESULTS = 10;
 const EXTERNAL_TIMEOUT_MS = 5_000; // Google 호출 타임아웃(초과하면 Open-Meteo로 폴백)
 const MAX_EXTERNAL_LOOKUPS = 2; // 검색 1회당 외부(Google/Open-Meteo) 조회 최대 횟수
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+// 허용 출처(2026-10-19 보안 점검 EDGE-07) - analyze-ticket과 동일한 이유/방식.
+const ALLOWED_ORIGINS = new Set([
+  "http://localhost:8080",
+  "https://triplog-nu.vercel.app",
+  "https://localhost",
+]);
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS_HEADERS, "Content-Type": "application/json; charset=utf-8" },
-  });
+function corsHeadersFor(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin") ?? req.headers.get("Origin");
+  return {
+    "Access-Control-Allow-Origin": origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://triplog-nu.vercel.app",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
 }
+
+type JsonFn = (body: unknown, status?: number) => Response;
 
 // ---- 로그인 확인 (analyze-ticket/travel-briefing과 같은 패턴) ----
 
@@ -537,7 +543,7 @@ function validateQuery(raw: unknown): string | null {
   return q.length >= minLen ? q : null;
 }
 
-async function handleSearch(req: Request, baseUrl: string, serviceKey: string, apiKey: string | undefined): Promise<Response> {
+async function handleSearch(req: Request, baseUrl: string, serviceKey: string, apiKey: string | undefined, json: JsonFn): Promise<Response> {
   const body = await req.json().catch(() => null);
   const q = validateQuery((body as Record<string, unknown> | null)?.q);
   if (!q) return json({ error: "q(검색어)가 비어있거나 길이가 맞지 않아요" }, 400);
@@ -652,7 +658,7 @@ function readSelectInput(body: unknown): SelectInput | null {
 
 const isResolved = (row: DestRow) => row.lat !== null && row.lng !== null && !!row.timezone && !!row.resolved_at;
 
-async function handleSelect(req: Request, baseUrl: string, serviceKey: string, apiKey: string | undefined): Promise<Response> {
+async function handleSelect(req: Request, baseUrl: string, serviceKey: string, apiKey: string | undefined, json: JsonFn): Promise<Response> {
   const body = await req.json().catch(() => null);
   const input = readSelectInput(body);
   if (!input) return json({ error: "destinationId 또는 placeId 또는 (nameEn+countryCode)가 필요해요" }, 400);
@@ -762,6 +768,13 @@ async function handleSelect(req: Request, baseUrl: string, serviceKey: string, a
 // ==========================================================================
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  const CORS_HEADERS = corsHeadersFor(req);
+  const json: JsonFn = (body, status = 200) =>
+    new Response(JSON.stringify(body), {
+      status,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json; charset=utf-8" },
+    });
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
   if (req.method !== "POST") return json({ error: "POST 요청만 받아요" }, 405);
 
@@ -782,7 +795,7 @@ Deno.serve(async (req: Request): Promise<Response> => {
   const raw = await req.clone().json().catch(() => null);
   const action = typeof (raw as Record<string, unknown> | null)?.action === "string" ? (raw as Record<string, unknown>).action : "search";
 
-  if (action === "select") return handleSelect(req, supabaseUrl, serviceRoleKey, apiKey);
-  if (action === "search") return handleSearch(req, supabaseUrl, serviceRoleKey, apiKey);
+  if (action === "select") return handleSelect(req, supabaseUrl, serviceRoleKey, apiKey, json);
+  if (action === "search") return handleSearch(req, supabaseUrl, serviceRoleKey, apiKey, json);
   return json({ error: "action은 'search' 또는 'select'여야 해요" }, 400);
 });

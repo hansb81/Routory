@@ -38,20 +38,22 @@ const NAVER_PROFILE_URL = "https://openapi.naver.com/v1/nid/me";
 const INTERNAL_EMAIL_DOMAIN = "users.triplog.app"; // 실제로 열리는 도메인일 필요는 없다 — Supabase 계정 식별자로만 쓴다
 const MAX_PARAM_CHARS = 2048; // code/state는 이보다 훨씬 짧지만, 이상한 값을 그대로 네이버에 보내지 않기 위한 상한
 
-const CORS_HEADERS = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-  "Access-Control-Allow-Methods": "POST, OPTIONS",
-};
+// 허용 출처(2026-10-19 보안 점검 EDGE-07) - analyze-ticket과 동일한 이유/방식.
+const ALLOWED_ORIGINS = new Set([
+  "http://localhost:8080",
+  "https://triplog-nu.vercel.app",
+  "https://localhost",
+]);
 
-function json(body: unknown, status = 200): Response {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...CORS_HEADERS, "Content-Type": "application/json; charset=utf-8" },
-  });
+function corsHeadersFor(req: Request): Record<string, string> {
+  const origin = req.headers.get("origin") ?? req.headers.get("Origin");
+  return {
+    "Access-Control-Allow-Origin": origin && ALLOWED_ORIGINS.has(origin) ? origin : "https://triplog-nu.vercel.app",
+    "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
+    "Access-Control-Allow-Methods": "POST, OPTIONS",
+    "Vary": "Origin",
+  };
 }
-
-const fail = (status: number, message: string) => json({ error: message }, status);
 
 // ---- 요청 읽기 ----
 
@@ -185,6 +187,15 @@ async function generateLoginToken(admin: SupabaseAdmin, email: string): Promise<
 // ---- 요청 처리 ----
 
 Deno.serve(async (req: Request): Promise<Response> => {
+  const CORS_HEADERS = corsHeadersFor(req);
+  function json(body: unknown, status = 200): Response {
+    return new Response(JSON.stringify(body), {
+      status,
+      headers: { ...CORS_HEADERS, "Content-Type": "application/json; charset=utf-8" },
+    });
+  }
+  const fail = (status: number, message: string) => json({ error: message }, status);
+
   if (req.method === "OPTIONS") return new Response("ok", { headers: CORS_HEADERS });
   if (req.method !== "POST") return fail(405, "POST 요청만 받아요");
 
